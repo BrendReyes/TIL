@@ -1,0 +1,11 @@
+version: "2"
+sql:
+  - engine: "sqlite"
+    queries: "db/queries/"
+    schema: "db/schema/"
+    gen:
+      go:
+        package: "sqlcdb"
+        out: "db/sqlc"
+        emit_json_tags: true
+        emit_prepared_queries: false
