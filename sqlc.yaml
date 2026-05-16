@@ -1,11 +1,8 @@
 version: "2"
 sql:
-  - engine: "sqlite"
-    queries: "db/queries/"
-    schema: "db/schema/"
+  - schema: "internal/sql/schema"
+    queries: "internal/sql/queries"
+    engine: "sqlite"
     gen:
       go:
-        package: "sqlcdb"
-        out: "db/sqlc"
-        emit_json_tags: true
-        emit_prepared_queries: false
+        out: "internal/database"
