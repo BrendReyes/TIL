@@ -158,6 +158,6 @@ If nothing is due:
 ---
 
 # Build Plan (Milestones)
-1. [] Download and import the necessary tools and libraries for cli and tui
-2. [] Initialize SQLite
-3. [] Create the table schema using goose migrations
+1. [x] Download and import the necessary tools and libraries for cli and tui
+2. [x] Initialize SQLite
+3. [x] Create the table schema using goose migrations

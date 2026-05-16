@@ -18,8 +18,9 @@ var addCmd = &cobra.Command{
 		   til add "BFS uses a queue, DFS uses a stack"
 		   til add BFS uses a queue, DFS uses a stack
 		  `,
-	RunE: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		fmt.Println("add called")
+		return nil
 	},
 }
 
