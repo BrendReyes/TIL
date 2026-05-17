@@ -52,6 +52,43 @@ func (q *Queries) DeleteEntry(ctx context.Context, id int64) error {
 	return err
 }
 
+const editEntry = `-- name: EditEntry :exec
+UPDATE entries
+SET body = ?, tag = ?
+WHERE id = ?
+`
+
+type EditEntryParams struct {
+	Body string
+	Tag  sql.NullString
+	ID   int64
+}
+
+func (q *Queries) EditEntry(ctx context.Context, arg EditEntryParams) error {
+	_, err := q.db.ExecContext(ctx, editEntry, arg.Body, arg.Tag, arg.ID)
+	return err
+}
+
+const getEntry = `-- name: GetEntry :one
+SELECT id, body, tag, created_at, last_reviewed_at, review_interval_days, review_count FROM entries
+WHERE id = ?
+`
+
+func (q *Queries) GetEntry(ctx context.Context, id int64) (Entry, error) {
+	row := q.db.QueryRowContext(ctx, getEntry, id)
+	var i Entry
+	err := row.Scan(
+		&i.ID,
+		&i.Body,
+		&i.Tag,
+		&i.CreatedAt,
+		&i.LastReviewedAt,
+		&i.ReviewIntervalDays,
+		&i.ReviewCount,
+	)
+	return i, err
+}
+
 const listAllEntry = `-- name: ListAllEntry :many
 SELECT id, body, tag, created_at, last_reviewed_at, review_interval_days, review_count FROM entries
 `

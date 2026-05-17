@@ -164,3 +164,5 @@ If nothing is due:
 3. [x] Create the table schema using goose migrations
 4. [x] Can add entry (basic)
 5. [x] Can view all entries
+6. [] Can edit using tui bubbletea
+7. [] Can review each, bubbletea and cli
