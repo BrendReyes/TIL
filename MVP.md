@@ -154,6 +154,7 @@ If nothing is due:
 1. Search 
 2. Reminders | "You have N entries overdue"
 3. Export / import | JSON dump of `entries` + `tags` is straightforward |
+4. Filter
 
 ---
 
@@ -162,3 +163,4 @@ If nothing is due:
 2. [x] Initialize SQLite
 3. [x] Create the table schema using goose migrations
 4. [x] Can add entry (basic)
+5. [x] Can view all entries

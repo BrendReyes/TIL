@@ -6,7 +6,7 @@ package cmd
 
 import (
 	"fmt"
-
+	"strconv"
 	"github.com/spf13/cobra"
 )
 
@@ -20,8 +20,13 @@ and usage of using your command. For example:
 Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("delete called")
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		id, err := strconv.ParseInt(args[0], 10, 64)
+        if err != nil {
+            return fmt.Errorf("invalid ID %q — must be a number", args[0])
+        }
+        return appState.DeleteEntry(id)
 	},
 }
 
