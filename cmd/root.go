@@ -6,11 +6,15 @@ package cmd
 
 import (
 	"os"
-
+	"github.com/brendreyes/til/internal/srs"
 	"github.com/spf13/cobra"
 )
 
+var appState *srs.State
 
+func SetState(s *srs.State) {
+	appState = s
+}
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{

@@ -6,10 +6,12 @@ package cmd
 
 import (
 	//"fmt"
-	"github.com/brendreyes/til/internal/srs"
+	
 	"github.com/spf13/cobra"
 
 )
+
+
 
 // addCmd represents the add command
 var addCmd = &cobra.Command{
@@ -21,17 +23,14 @@ var addCmd = &cobra.Command{
 		  `,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		err := srs.AddEntry(args[0])
-		if err != nil {
-			return err
-		}
-
-		return nil
+		tag, _ := cmd.Flags().GetString("tag")
+		return appState.AddEntry(args[0], tag)
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(addCmd)
+	addCmd.Flags().StringP("tag", "t", "", "Tag to categorize this entry (e.g. -t algorithms)")
 
 	// Here you will define your flags and configuration settings.
 

@@ -8,11 +8,13 @@ package database
 import (
 	"context"
 	"database/sql"
+	"time"
 )
 
 const createEntry = `-- name: CreateEntry :one
-INSERT INTO entries (body, tag) 
+INSERT INTO entries (body, tag, created_at) 
 VALUES (
+    ?,
     ?,
     ?
 )
@@ -20,12 +22,13 @@ RETURNING id, body, tag, created_at, last_reviewed_at, review_interval_days, rev
 `
 
 type CreateEntryParams struct {
-	Body string
-	Tag  sql.NullString
+	Body      string
+	Tag       sql.NullString
+	CreatedAt time.Time
 }
 
 func (q *Queries) CreateEntry(ctx context.Context, arg CreateEntryParams) (Entry, error) {
-	row := q.db.QueryRowContext(ctx, createEntry, arg.Body, arg.Tag)
+	row := q.db.QueryRowContext(ctx, createEntry, arg.Body, arg.Tag, arg.CreatedAt)
 	var i Entry
 	err := row.Scan(
 		&i.ID,

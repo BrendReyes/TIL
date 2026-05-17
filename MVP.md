@@ -161,3 +161,4 @@ If nothing is due:
 1. [x] Download and import the necessary tools and libraries for cli and tui
 2. [x] Initialize SQLite
 3. [x] Create the table schema using goose migrations
+4. [x] Can add entry (basic)

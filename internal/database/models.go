@@ -6,13 +6,14 @@ package database
 
 import (
 	"database/sql"
+	"time"
 )
 
 type Entry struct {
 	ID                 int64
 	Body               string
 	Tag                sql.NullString
-	CreatedAt          sql.NullTime
+	CreatedAt          time.Time
 	LastReviewedAt     sql.NullTime
 	ReviewIntervalDays int64
 	ReviewCount        int64

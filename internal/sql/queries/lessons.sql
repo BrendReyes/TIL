@@ -1,6 +1,7 @@
 -- name: CreateEntry :one
-INSERT INTO entries (body, tag) 
+INSERT INTO entries (body, tag, created_at) 
 VALUES (
+    ?,
     ?,
     ?
 )
