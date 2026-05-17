@@ -2,6 +2,7 @@ package srs
 
 import (
 	"context"
+	"fmt"
 	"database/sql"
 	"time"
 	"github.com/brendreyes/til/internal/database"
@@ -23,7 +24,7 @@ func (s *State) AddEntry(entry string, tag string) error {
 		CreatedAt: time.Now(),
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("couldn't add entry: %w", err)
 	}
 
     return nil

@@ -11,7 +11,7 @@ func (s *State) DeleteEntry(id int64) error {
 		return fmt.Errorf("couldn't delete entry: %w", err)
 	}
 
-	fmt.Printf("[%d] Delete Successfull\n", id)
+	fmt.Printf("[%d] Deleted Successfully\n", id)
 
     return nil
 }

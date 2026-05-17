@@ -26,6 +26,14 @@ to quickly create a Cobra application.`,
         if err != nil {
             return fmt.Errorf("invalid ID %q — must be a number", args[0])
         }
+
+		fmt.Printf("Delete entry #%d? [y/N] ", id)
+		var confirm string
+		fmt.Scanln(&confirm)
+		if confirm != "y" && confirm != "Y" {
+			fmt.Println("Aborted.")
+			return nil
+		}
         return appState.DeleteEntry(id)
 	},
 }

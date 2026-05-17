@@ -154,7 +154,7 @@ If nothing is due:
 1. Search 
 2. Reminders | "You have N entries overdue"
 3. Export / import | JSON dump of `entries` + `tags` is straightforward |
-4. Filter
+4. Filter / sort / pagination
 
 ---
 
