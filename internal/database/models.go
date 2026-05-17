@@ -8,7 +8,7 @@ import (
 	"database/sql"
 )
 
-type Lesson struct {
+type Entry struct {
 	ID                 int64
 	Body               string
 	Tag                sql.NullString

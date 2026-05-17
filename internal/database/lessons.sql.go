@@ -10,8 +10,8 @@ import (
 	"database/sql"
 )
 
-const createLesson = `-- name: CreateLesson :one
-INSERT INTO lessons (body, tag) 
+const createEntry = `-- name: CreateEntry :one
+INSERT INTO entries (body, tag) 
 VALUES (
     ?,
     ?
@@ -19,14 +19,14 @@ VALUES (
 RETURNING id, body, tag, created_at, last_reviewed_at, review_interval_days, review_count
 `
 
-type CreateLessonParams struct {
+type CreateEntryParams struct {
 	Body string
 	Tag  sql.NullString
 }
 
-func (q *Queries) CreateLesson(ctx context.Context, arg CreateLessonParams) (Lesson, error) {
-	row := q.db.QueryRowContext(ctx, createLesson, arg.Body, arg.Tag)
-	var i Lesson
+func (q *Queries) CreateEntry(ctx context.Context, arg CreateEntryParams) (Entry, error) {
+	row := q.db.QueryRowContext(ctx, createEntry, arg.Body, arg.Tag)
+	var i Entry
 	err := row.Scan(
 		&i.ID,
 		&i.Body,

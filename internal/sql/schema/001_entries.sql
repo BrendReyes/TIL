@@ -1,5 +1,5 @@
 -- +goose Up
-CREATE TABLE lessons (
+CREATE TABLE entries (
     id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
     body TEXT NOT NULL,
     tag TEXT,
@@ -10,4 +10,4 @@ CREATE TABLE lessons (
 );
 
 -- +goose Down
-DROP TABLE lessons;
+DROP TABLE entries;

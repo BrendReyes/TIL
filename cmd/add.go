@@ -5,9 +5,10 @@ Copyright © 2026 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
-	"fmt"
-
+	//"fmt"
+	"github.com/brendreyes/til/internal/srs"
 	"github.com/spf13/cobra"
+
 )
 
 // addCmd represents the add command
@@ -18,8 +19,13 @@ var addCmd = &cobra.Command{
 		   til add "BFS uses a queue, DFS uses a stack"
 		   til add BFS uses a queue, DFS uses a stack
 		  `,
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("add called")
+		err := srs.AddEntry(args[0])
+		if err != nil {
+			return err
+		}
+
 		return nil
 	},
 }

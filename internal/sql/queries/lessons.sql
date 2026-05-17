@@ -1,5 +1,5 @@
--- name: CreateLesson :one
-INSERT INTO lessons (body, tag) 
+-- name: CreateEntry :one
+INSERT INTO entries (body, tag) 
 VALUES (
     ?,
     ?
