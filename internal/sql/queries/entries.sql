@@ -1,6 +1,8 @@
 -- name: CreateEntry :one
-INSERT INTO entries (body, tag, created_at) 
+INSERT INTO entries (body, tag, created_at, updated_at, last_reviewed_at) 
 VALUES (
+    ?,
+    ?,
     ?,
     ?,
     ?
@@ -20,5 +22,20 @@ WHERE id = ?;
 
 -- name: EditEntry :exec
 UPDATE entries
-SET body = ?, tag = ?
+SET body = ?, tag = ?, updated_at = ?
+WHERE id = ?;
+
+-- name: GetDueEntries :many
+SELECT *
+FROM entries
+WHERE last_reviewed_at IS NULL
+   OR datetime(last_reviewed_at, '+' || review_interval_days || ' days') <= datetime('now')
+ORDER BY last_reviewed_at ASC NULLS FIRST;
+
+-- name: UpdateReview :exec
+UPDATE entries
+SET last_reviewed_at     = ?,
+    review_interval_days = ?,
+    ease_factor          = ?,
+    review_count         = review_count + 1
 WHERE id = ?;

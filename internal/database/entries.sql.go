@@ -12,23 +12,33 @@ import (
 )
 
 const createEntry = `-- name: CreateEntry :one
-INSERT INTO entries (body, tag, created_at) 
+INSERT INTO entries (body, tag, created_at, updated_at, last_reviewed_at) 
 VALUES (
+    ?,
+    ?,
     ?,
     ?,
     ?
 )
-RETURNING id, body, tag, created_at, last_reviewed_at, review_interval_days, review_count
+RETURNING id, body, tag, created_at, last_reviewed_at, review_interval_days, review_count, ease_factor, updated_at
 `
 
 type CreateEntryParams struct {
-	Body      string
-	Tag       sql.NullString
-	CreatedAt time.Time
+	Body           string
+	Tag            sql.NullString
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	LastReviewedAt time.Time
 }
 
 func (q *Queries) CreateEntry(ctx context.Context, arg CreateEntryParams) (Entry, error) {
-	row := q.db.QueryRowContext(ctx, createEntry, arg.Body, arg.Tag, arg.CreatedAt)
+	row := q.db.QueryRowContext(ctx, createEntry,
+		arg.Body,
+		arg.Tag,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+		arg.LastReviewedAt,
+	)
 	var i Entry
 	err := row.Scan(
 		&i.ID,
@@ -38,6 +48,8 @@ func (q *Queries) CreateEntry(ctx context.Context, arg CreateEntryParams) (Entry
 		&i.LastReviewedAt,
 		&i.ReviewIntervalDays,
 		&i.ReviewCount,
+		&i.EaseFactor,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
@@ -54,23 +66,70 @@ func (q *Queries) DeleteEntry(ctx context.Context, id int64) error {
 
 const editEntry = `-- name: EditEntry :exec
 UPDATE entries
-SET body = ?, tag = ?
+SET body = ?, tag = ?, updated_at = ?
 WHERE id = ?
 `
 
 type EditEntryParams struct {
-	Body string
-	Tag  sql.NullString
-	ID   int64
+	Body      string
+	Tag       sql.NullString
+	UpdatedAt time.Time
+	ID        int64
 }
 
 func (q *Queries) EditEntry(ctx context.Context, arg EditEntryParams) error {
-	_, err := q.db.ExecContext(ctx, editEntry, arg.Body, arg.Tag, arg.ID)
+	_, err := q.db.ExecContext(ctx, editEntry,
+		arg.Body,
+		arg.Tag,
+		arg.UpdatedAt,
+		arg.ID,
+	)
 	return err
 }
 
+const getDueEntries = `-- name: GetDueEntries :many
+SELECT id, body, tag, created_at, last_reviewed_at, review_interval_days, review_count, ease_factor, updated_at
+FROM entries
+WHERE last_reviewed_at IS NULL
+   OR datetime(last_reviewed_at, '+' || review_interval_days || ' days') <= datetime('now')
+ORDER BY last_reviewed_at ASC NULLS FIRST
+`
+
+func (q *Queries) GetDueEntries(ctx context.Context) ([]Entry, error) {
+	rows, err := q.db.QueryContext(ctx, getDueEntries)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Entry
+	for rows.Next() {
+		var i Entry
+		if err := rows.Scan(
+			&i.ID,
+			&i.Body,
+			&i.Tag,
+			&i.CreatedAt,
+			&i.LastReviewedAt,
+			&i.ReviewIntervalDays,
+			&i.ReviewCount,
+			&i.EaseFactor,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getEntry = `-- name: GetEntry :one
-SELECT id, body, tag, created_at, last_reviewed_at, review_interval_days, review_count FROM entries
+SELECT id, body, tag, created_at, last_reviewed_at, review_interval_days, review_count, ease_factor, updated_at FROM entries
 WHERE id = ?
 `
 
@@ -85,12 +144,14 @@ func (q *Queries) GetEntry(ctx context.Context, id int64) (Entry, error) {
 		&i.LastReviewedAt,
 		&i.ReviewIntervalDays,
 		&i.ReviewCount,
+		&i.EaseFactor,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
 
 const listAllEntry = `-- name: ListAllEntry :many
-SELECT id, body, tag, created_at, last_reviewed_at, review_interval_days, review_count FROM entries
+SELECT id, body, tag, created_at, last_reviewed_at, review_interval_days, review_count, ease_factor, updated_at FROM entries
 `
 
 func (q *Queries) ListAllEntry(ctx context.Context) ([]Entry, error) {
@@ -110,6 +171,8 @@ func (q *Queries) ListAllEntry(ctx context.Context) ([]Entry, error) {
 			&i.LastReviewedAt,
 			&i.ReviewIntervalDays,
 			&i.ReviewCount,
+			&i.EaseFactor,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -122,4 +185,30 @@ func (q *Queries) ListAllEntry(ctx context.Context) ([]Entry, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateReview = `-- name: UpdateReview :exec
+UPDATE entries
+SET last_reviewed_at     = ?,
+    review_interval_days = ?,
+    ease_factor          = ?,
+    review_count         = review_count + 1
+WHERE id = ?
+`
+
+type UpdateReviewParams struct {
+	LastReviewedAt     time.Time
+	ReviewIntervalDays int64
+	EaseFactor         float64
+	ID                 int64
+}
+
+func (q *Queries) UpdateReview(ctx context.Context, arg UpdateReviewParams) error {
+	_, err := q.db.ExecContext(ctx, updateReview,
+		arg.LastReviewedAt,
+		arg.ReviewIntervalDays,
+		arg.EaseFactor,
+		arg.ID,
+	)
+	return err
 }

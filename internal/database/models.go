@@ -14,7 +14,9 @@ type Entry struct {
 	Body               string
 	Tag                sql.NullString
 	CreatedAt          time.Time
-	LastReviewedAt     sql.NullTime
+	LastReviewedAt     time.Time
 	ReviewIntervalDays int64
 	ReviewCount        int64
+	EaseFactor         float64
+	UpdatedAt          time.Time
 }

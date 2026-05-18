@@ -22,6 +22,8 @@ func (s *State) AddEntry(entry string, tag string) error {
 		Body: entry,
 		Tag:  nullTag,
 		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		LastReviewedAt: time.Now(),
 	})
 	if err != nil {
 		return fmt.Errorf("couldn't add entry: %w", err)

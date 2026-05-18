@@ -3,6 +3,8 @@ package srs
 import (
 	"context"
 	"fmt"
+	"time"
+	"strings"
 	"database/sql"
 	"github.com/brendreyes/til/internal/database"
 )
@@ -12,8 +14,6 @@ func (s *State) EditEntry(id int64) error {
 	if err != nil {
 		return fmt.Errorf("[#%d] Does not exist: %w", id, err)
 	}
-
-	fmt.Printf("This will be edited:\nid: %d\nbody: %s\ntag: %s\ncreated_at: %s\n", entry.ID, entry.Body, entry.Tag, entry.CreatedAt.Format("2006-01-02 15:04:05"))
 
 	// Calling the TUI Editor goes here
 	currentTag := ""
@@ -29,6 +29,13 @@ func (s *State) EditEntry(id int64) error {
 		return nil
 	}
 
+	newBody = strings.TrimSpace(newBody)
+	newTag = strings.TrimSpace(newTag)
+	if newBody == strings.TrimSpace(entry.Body) && newTag == currentTag {
+	    fmt.Println("No changes detected...")
+	    return nil
+	}
+
 	err = s.DB.EditEntry(context.Background(), database.EditEntryParams{
 		ID:   id,
 		Body: newBody,
@@ -36,6 +43,7 @@ func (s *State) EditEntry(id int64) error {
 			String: newTag, 
 			Valid: newTag != "",
 		},
+		UpdatedAt: time.Now(),
 	})
 
 	if err != nil {
@@ -45,18 +53,4 @@ func (s *State) EditEntry(id int64) error {
 	fmt.Printf("✓ Updated entry #%d\n", id)
 	return nil
 
-
-	// below here will probably be applied in the TUI part
-	/*
-	_, err := s.DB.EditEntry(context.Background(), database.EditEntryParams{
-		Body: body,
-		Tag:  tag,
-		ID: id,
-	})
-	if err != nil {
-		return fmt.Errorf("couldn't edit entry: %w", err)
-	}
-	*/
-
-    return nil
 }

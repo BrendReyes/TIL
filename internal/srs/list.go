@@ -38,13 +38,11 @@ func printEntry(entry database.Entry) {
 
     fmt.Printf("  Created:          %s\n", entry.CreatedAt.Format("2006-01-02 15:04:05"))
 
-    if entry.LastReviewedAt.Valid {
-        fmt.Printf("  Last Reviewed:    %s\n", entry.LastReviewedAt.Time.Format("2006-01-02 15:04:05"))
-    } else {
-        fmt.Printf("  Last Reviewed:    (never)\n")
-    }
 
-    //fmt.Printf("  Review Interval:  %d days\n", entry.ReviewIntervalDays)
+    fmt.Printf("  Last Reviewed:    %s\n", entry.LastReviewedAt.Format("2006-01-02 15:04:05"))
+
+
+    fmt.Printf("  Review Interval:  %d days\n", entry.ReviewIntervalDays)
     fmt.Printf("  Review Count:     %d\n", entry.ReviewCount)
     fmt.Println("----------------")
 }
