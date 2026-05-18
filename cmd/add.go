@@ -6,7 +6,7 @@ package cmd
 
 import (
 	//"fmt"
-	
+	"strings"
 	"github.com/spf13/cobra"
 
 )
@@ -15,16 +15,19 @@ import (
 
 // addCmd represents the add command
 var addCmd = &cobra.Command{
-	Use:   "add",
-	Short: "Add what you have learned",
-	Long: `Add what you have learned:
-		   til add "BFS uses a queue, DFS uses a stack"
-		   til add BFS uses a queue, DFS uses a stack
-		  `,
-	Args: cobra.ExactArgs(1),
+	Use:   "add <content>",
+	Short: "Capture a new learning entry",
+    Long: `Add a new entry to your TIL database.
+   
+Example:
+  til add "In Go, defer runs LIFO" --tag go
+  til add "BFS uses a queue, DFS uses a stack" -t algorithms`,
+
+	Args: cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		content := strings.Join(args, " ")
 		tag, _ := cmd.Flags().GetString("tag")
-		return appState.AddEntry(args[0], tag)
+		return appState.AddEntry(content, tag)
 	},
 }
 

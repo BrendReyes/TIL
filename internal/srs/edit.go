@@ -45,7 +45,7 @@ func (s *State) EditEntry(id int64) error {
 	})
 
 	if err != nil {
-		return fmt.Errorf("failed to save changes: %w", err)
+		return fmt.Errorf("Failed to save changes: %w", err)
 	}
 
 	fmt.Printf("✓ Updated entry #%d\n", id)

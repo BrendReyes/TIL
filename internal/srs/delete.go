@@ -16,7 +16,8 @@ func (s *State) DeleteEntry(id int64) error {
 		return fmt.Errorf("couldn't verify deletion: %w", err)
 	}
 	if rows == 0 {
-		return fmt.Errorf("entry #%d not found", id)
+		fmt.Printf("entry [#%d] not found\n", id)
+		return nil
 	}
 
 	fmt.Printf("[%d] Deleted Successfully\n", id)

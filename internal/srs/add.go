@@ -9,7 +9,8 @@ import (
 
 func (s *State) AddEntry(entry string, tag string) error {
 	if entry == "" || tag == "" {
-		fmt.Errorf("Body and Tag is required")
+		fmt.Errorf("Body and Tag is required.")
+		return nil
 	} 
 
 	_, err := s.DB.CreateEntry(context.Background(), database.CreateEntryParams{
@@ -20,7 +21,7 @@ func (s *State) AddEntry(entry string, tag string) error {
 		LastReviewedAt: time.Now().UTC(),
 	})
 	if err != nil {
-		return fmt.Errorf("couldn't add entry: %w", err)
+		return fmt.Errorf("Couldn't add entry: %w", err)
 	}
 
     return nil

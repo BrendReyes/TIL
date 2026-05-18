@@ -16,6 +16,8 @@ SELECT * FROM entries;
 DELETE FROM entries
 WHERE id = ?;
 
+-- name: DeleteMultipleEntry :execresult
+
 -- name: GetEntry :one
 SELECT * FROM entries
 WHERE id = ?;

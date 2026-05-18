@@ -9,15 +9,14 @@ import (
 func (s *State) ListEntry() error {
 	entries, err := s.DB.ListAllEntry(context.Background())
 	if err != nil {
-		return fmt.Errorf("couldn't list entries: %w", err)
+		return fmt.Errorf("Couldn't list entries: %w", err)
 	}
 
 	if len(entries) == 0 {
-    	fmt.Println("No entries found.")
+    	fmt.Println("No entries found. Use 'til add <body> -t <tag>' to start.")
     	return nil
 	}
 
-	fmt.Println("what you have learned:")
 	for _, entry := range entries {
 		printEntry(entry)
 	}
