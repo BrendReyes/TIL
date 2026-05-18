@@ -90,9 +90,9 @@ func (q *Queries) EditEntry(ctx context.Context, arg EditEntryParams) error {
 const getDueEntries = `-- name: GetDueEntries :many
 SELECT id, body, tag, created_at, last_reviewed_at, review_interval_days, review_count, ease_factor, updated_at
 FROM entries
-WHERE last_reviewed_at IS NULL
+WHERE review_count = 0
    OR datetime(last_reviewed_at, '+' || review_interval_days || ' days') <= datetime('now')
-ORDER BY last_reviewed_at ASC NULLS FIRST
+ORDER BY review_count ASC, last_reviewed_at ASC
 `
 
 func (q *Queries) GetDueEntries(ctx context.Context) ([]Entry, error) {
@@ -192,7 +192,7 @@ UPDATE entries
 SET last_reviewed_at     = ?,
     review_interval_days = ?,
     ease_factor          = ?,
-    review_count         = review_count + 1
+    review_count         = ?
 WHERE id = ?
 `
 
@@ -200,6 +200,7 @@ type UpdateReviewParams struct {
 	LastReviewedAt     time.Time
 	ReviewIntervalDays int64
 	EaseFactor         float64
+	ReviewCount        int64
 	ID                 int64
 }
 
@@ -208,6 +209,7 @@ func (q *Queries) UpdateReview(ctx context.Context, arg UpdateReviewParams) erro
 		arg.LastReviewedAt,
 		arg.ReviewIntervalDays,
 		arg.EaseFactor,
+		arg.ReviewCount,
 		arg.ID,
 	)
 	return err

@@ -28,14 +28,14 @@ WHERE id = ?;
 -- name: GetDueEntries :many
 SELECT *
 FROM entries
-WHERE last_reviewed_at IS NULL
+WHERE review_count = 0
    OR datetime(last_reviewed_at, '+' || review_interval_days || ' days') <= datetime('now')
-ORDER BY last_reviewed_at ASC NULLS FIRST;
+ORDER BY review_count ASC, last_reviewed_at ASC;
 
 -- name: UpdateReview :exec
 UPDATE entries
 SET last_reviewed_at     = ?,
     review_interval_days = ?,
     ease_factor          = ?,
-    review_count         = review_count + 1
+    review_count         = ?
 WHERE id = ?;

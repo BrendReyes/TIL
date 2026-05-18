@@ -21,9 +21,9 @@ func (s *State) AddEntry(entry string, tag string) error {
 	_, err := s.DB.CreateEntry(context.Background(), database.CreateEntryParams{
 		Body: entry,
 		Tag:  nullTag,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-		LastReviewedAt: time.Now(),
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
+		LastReviewedAt: time.Now().UTC(),
 	})
 	if err != nil {
 		return fmt.Errorf("couldn't add entry: %w", err)

@@ -3,13 +3,47 @@ package srs
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/brendreyes/til/internal/database"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
-// reviewUpdatedMsg is sent when a DB update finishes
+var (
+	reviewFocusedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
+	reviewBlurredStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+
+	reviewBorderStyle = lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(lipgloss.Color("62")).
+				Padding(0, 1).
+				Width(60)
+
+	reviewDocStyle  = lipgloss.NewStyle().Margin(1, 2)
+	reviewHelpStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).MarginTop(1)
+	reviewTitleStyle = lipgloss.NewStyle().
+			Background(lipgloss.Color("62")).
+			Foreground(lipgloss.Color("230")).
+			Padding(0, 1).
+			MarginBottom(1).
+			Bold(true)
+
+	scoreSelectedStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("230")).
+				Background(lipgloss.Color("205")).
+				Padding(0, 1).
+				MarginRight(1).
+				Bold(true)
+
+	scoreNormalStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("240")).
+				Background(lipgloss.Color("235")).
+				Padding(0, 1).
+				MarginRight(1)
+)
+
+// reviewUpdatedMsg is sent back to the Update loop when a DB write completes.
 type reviewUpdatedMsg struct{ err error }
 
 type reviewModel struct {
@@ -17,15 +51,18 @@ type reviewModel struct {
 	currentIndex  int
 	db            *database.Queries
 	showAnswer    bool
+	selection     int // 0: Again, 1: Hard, 2: Good, 3: Easy
 	err           error
 	reviewedCount int
+	quitting bool
 }
 
 func NewReviewModel(entries []database.Entry, db *database.Queries) *reviewModel {
 	return &reviewModel{
-		entries:      entries,
-		db:           db,
-		showAnswer:   false,
+		entries:    entries,
+		db:         db,
+		showAnswer: false,
+		selection:  2, // Default to "Good"
 	}
 }
 
@@ -38,59 +75,51 @@ func (m *reviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "ctrl+c", "q":
+		case "ctrl+c", "q", "esc":
 			return m, tea.Quit
 
-		// 1. Reveal Answer
+		// Reveal answer, then on second press submit the selected score
 		case "enter", " ":
 			if !m.showAnswer {
 				m.showAnswer = true
 				return m, nil
 			}
+			return m.submitScore()
 
-		// 2. Score Answer (Only if answer is shown)
+		case "left", "h", "up":
+			if m.showAnswer && m.selection > 0 {
+				m.selection--
+			}
+		case "right", "l", "down":
+			if m.showAnswer && m.selection < 3 {
+				m.selection++
+			}
+
+		// Direct score selection via number keys
 		case "1", "2", "3", "4":
 			if !m.showAnswer {
-				return m, nil // Ignore if they haven't revealed the answer
+				m.showAnswer = true
 			}
-
-			// Map keypress to SM-2 quality score
-			quality := 0
 			switch msg.String() {
-			case "1": quality = 1 // Again (Failed)
-			case "2": quality = 3 // Hard
-			case "3": quality = 4 // Good
-			case "4": quality = 5 // Easy
+			case "1":
+				m.selection = 0
+			case "2":
+				m.selection = 1
+			case "3":
+				m.selection = 2
+			case "4":
+				m.selection = 3
 			}
-
-			// Calculate the new values
-			currentEntry := m.entries[m.currentIndex]
-			updateParams := calculateNextReview(currentEntry, quality)
-
-			// Create a command to save to DB in the background
-			saveCmd := func() tea.Msg {
-				err := m.db.UpdateReview(context.Background(), updateParams)
-				return reviewUpdatedMsg{err}
-			}
-
-			// Advance the card
-			m.reviewedCount++
-			m.currentIndex++
-			m.showAnswer = false
-
-			// If we are at the end, quit
-			if m.currentIndex >= len(m.entries) {
-				return m, tea.Batch(saveCmd, tea.Quit)
-			}
-
-			// Otherwise, return the model and the save command
-			return m, saveCmd
+			return m.submitScore()
 		}
 
-	// 3. Handle Database Error
 	case reviewUpdatedMsg:
 		if msg.err != nil {
 			m.err = msg.err
+			return m, tea.Quit
+		}
+
+		if m.quitting {
 			return m, tea.Quit
 		}
 	}
@@ -98,39 +127,108 @@ func (m *reviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m *reviewModel) submitScore() (tea.Model, tea.Cmd) {
+	// Map UI selection to SM-2 quality score
+	quality := 0
+	switch m.selection {
+	case 0:
+		quality = 1 // Again (failed)
+	case 1:
+		quality = 3 // Hard
+	case 2:
+		quality = 4 // Good
+	case 3:
+		quality = 5 // Easy
+	}
+
+	currentEntry := m.entries[m.currentIndex]
+	updateParams := calculateNextReview(currentEntry, quality)
+
+	saveCmd := func() tea.Msg {
+		err := m.db.UpdateReview(context.Background(), updateParams)
+		return reviewUpdatedMsg{err}
+	}
+
+	m.reviewedCount++
+	m.currentIndex++
+	m.showAnswer = false
+	m.selection = 2 // Reset to "Good" for the next card
+
+	if m.currentIndex >= len(m.entries) {
+		m.quitting = true
+		return m, saveCmd
+	}
+
+	return m, saveCmd
+}
+
 func (m *reviewModel) View() string {
 	if m.err != nil {
 		return fmt.Sprintf("\nError: %v\n", m.err)
 	}
 	if m.currentIndex >= len(m.entries) {
-		return "\nAll done!\n"
+		return ""
 	}
 
 	entry := m.entries[m.currentIndex]
 
-	// Basic Styling
-	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("62")).MarginBottom(1)
-	tagStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).MarginTop(2)
+	header := reviewTitleStyle.Render(fmt.Sprintf("Reviewing %d of %d", m.currentIndex+1, len(m.entries)))
 
-	// Build View
-	view := titleStyle.Render(fmt.Sprintf("Reviewing %d of %d", m.currentIndex+1, len(m.entries))) + "\n"
-	view += fmt.Sprintf("ID: %d\n", entry.ID)
-
-	if entry.Tag.Valid {
-		view += tagStyle.Render(fmt.Sprintf("Tags: %s\n", entry.Tag.String))
-	}
-
-	view += "\n" + entry.Body + "\n"
-
-	// Show Controls
-	if !m.showAnswer {
-		view += helpStyle.Render("\n[Enter/Space] Continue/Proceed   [q] Quit")
+	var tagView string
+	if entry.Tag.Valid && entry.Tag.String != "" {
+		tagView = reviewFocusedStyle.Render("● " + entry.Tag.String)
 	} else {
-		// NOTE: In a real flashcard app, the answer is hidden.
-		// Since TIL entries are just bodies of text, we just ask "How well did you know this?"
-		view += helpStyle.Render("\nHow well did you recall this?\n[1] Again  [2] Hard  [3] Good  [4] Easy   [q] Quit")
+		tagView = reviewBlurredStyle.Render("○ no tags")
 	}
 
-	return view
+	bodyContent := entry.Body
+	if len(bodyContent) > 56 {
+		bodyContent = ""
+		words := strings.Fields(entry.Body)
+		line := ""
+		for _, word := range words {
+			if len(line)+len(word) > 56 {
+				bodyContent += line + "\n"
+				line = word + " "
+			} else {
+				line += word + " "
+			}
+		}
+		bodyContent += line
+	}
+	bodyView := reviewBorderStyle.Render(bodyContent)
+
+	var controls string
+	if !m.showAnswer {
+		controls = reviewHelpStyle.Render("enter: reveal • q: quit")
+	} else {
+		scores := []string{"Again", "Hard", "Good", "Easy"}
+		var scoreButtons []string
+		for i, name := range scores {
+			btnText := fmt.Sprintf("%d:%s", i+1, name)
+			if m.selection == i {
+				scoreButtons = append(scoreButtons, scoreSelectedStyle.Render(btnText))
+			} else {
+				scoreButtons = append(scoreButtons, scoreNormalStyle.Render(btnText))
+			}
+		}
+		controls = lipgloss.JoinVertical(
+			lipgloss.Left,
+			reviewHelpStyle.Render("How well did you remember this?"),
+			lipgloss.JoinHorizontal(lipgloss.Top, scoreButtons...),
+			reviewHelpStyle.Render("\narrows: navigate • enter: confirm • 1-4: direct select • q: quit"),
+		)
+	}
+
+	s := lipgloss.JoinVertical(
+		lipgloss.Left,
+		header,
+		tagView,
+		"",
+		bodyView,
+		"",
+		controls,
+	)
+
+	return reviewDocStyle.Render(s)
 }

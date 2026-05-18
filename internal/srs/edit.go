@@ -43,7 +43,7 @@ func (s *State) EditEntry(id int64) error {
 			String: newTag, 
 			Valid: newTag != "",
 		},
-		UpdatedAt: time.Now(),
+		UpdatedAt: time.Now().UTC(),
 	})
 
 	if err != nil {
