@@ -12,12 +12,12 @@ func (s *State) AddEntry(entry string, tag string) error {
 		return fmt.Errorf("Body or Tag cannot be empty.")
 	}
 	
-	if len(entry) > 800 {
-		return fmt.Errorf("800 characters exceeded....")
+	if len(entry) > 1000 {
+		return fmt.Errorf("characters exceeded for the content.... (max 1000)")
 	}
 
 	if len(tag) > 100 {
-		return fmt.Errorf("100 characters exceeded....")
+		return fmt.Errorf("characters exceeded for the tag.... (max 100)")
 	}
 
 	_, err := s.DB.CreateEntry(context.Background(), database.CreateEntryParams{

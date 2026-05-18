@@ -48,7 +48,7 @@ func RunEditor(initialBody, initialTag string) (string, string, bool, error) {
 	ta.Placeholder = "What did you learn?"
 	ta.SetValue(initialBody)
 	ta.Focus()
-	ta.CharLimit = 800
+	ta.CharLimit = 1000
 	ta.SetWidth(50)
 	ta.SetHeight(5)
 

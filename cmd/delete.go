@@ -7,35 +7,35 @@ package cmd
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"github.com/spf13/cobra"
 )
 
 // deleteCmd represents the delete command
 var deleteCmd = &cobra.Command{
-	Use:   "delete <id>",
+	Use:   `delete all or delete <id>`,
 	Short: "Delete an entry",
-	Long: `Permanently remove entry from your database`,
+	Long: `Permanently remove entry from the storage
+  til delete all
+  til delete 5
+	`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if strings.ToLower(args[0]) == "all" {
+			return appState.RemoveAllEntry()
+		}
+
 		id, err := strconv.ParseInt(args[0], 10, 64)
         if err != nil {
-            return fmt.Errorf("invalid ID %q — must be a number", args[0])
+            return fmt.Errorf("invalid ID %q — must be a valid id", args[0])
         }
-
-		fmt.Printf("Delete entry #%d? [y/N] ", id)
-		var confirm string
-		fmt.Scanln(&confirm)
-		if confirm != "y" && confirm != "Y" {
-			fmt.Println("Aborted.")
-			return nil
-		}
+		
         return appState.DeleteEntry(id)
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(deleteCmd)
-
 	// Here you will define your flags and configuration settings.
 
 	// Cobra supports Persistent Flags which will work for this command

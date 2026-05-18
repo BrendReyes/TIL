@@ -39,7 +39,11 @@ func (s *State) GetSpecificEntry(id int64) error {
 func (s *State) ListEntriesByTag(tag string) error {
 	entries, err := s.DB.GetEntriesByTag(context.Background(), tag)
 	if err != nil {
-		fmt.Printf("No entries found with '%s' tag\n", tag)
+		return fmt.Errorf("Couldn't fetch by tag: %w", err)
+	}
+
+	if len(entries) == 0 {
+		fmt.Printf("No entries found with '%s' \n", tag)
 		return nil
 	}
 

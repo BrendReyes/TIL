@@ -54,6 +54,18 @@ func (q *Queries) CreateEntry(ctx context.Context, arg CreateEntryParams) (Entry
 	return i, err
 }
 
+const deleteAllEntries = `-- name: DeleteAllEntries :execrows
+DELETE FROM entries
+`
+
+func (q *Queries) DeleteAllEntries(ctx context.Context) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteAllEntries)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const deleteEntry = `-- name: DeleteEntry :execresult
 DELETE FROM entries
 WHERE id = ?

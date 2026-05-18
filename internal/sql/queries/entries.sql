@@ -16,6 +16,9 @@ SELECT * FROM entries;
 DELETE FROM entries
 WHERE id = ?;
 
+-- name: DeleteAllEntries :execrows
+DELETE FROM entries;
+
 -- name: GetEntry :one
 SELECT * FROM entries
 WHERE id = ?;
