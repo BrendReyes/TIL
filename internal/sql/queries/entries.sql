@@ -12,6 +12,9 @@ RETURNING *;
 -- name: ListAllEntry :many
 SELECT * FROM entries;
 
+-- name: CountAllEntries :one
+SELECT COUNT(*) FROM entries;
+
 -- name: DeleteEntry :execresult
 DELETE FROM entries
 WHERE id = ?;

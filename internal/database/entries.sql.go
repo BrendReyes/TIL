@@ -11,6 +11,17 @@ import (
 	"time"
 )
 
+const countAllEntries = `-- name: CountAllEntries :one
+SELECT COUNT(*) FROM entries
+`
+
+func (q *Queries) CountAllEntries(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countAllEntries)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createEntry = `-- name: CreateEntry :one
 INSERT INTO entries (body, tag, created_at, updated_at, last_reviewed_at) 
 VALUES (

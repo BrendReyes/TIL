@@ -54,6 +54,17 @@ func (s *State) ListEntriesByTag(tag string) error {
 	return nil
 }
 
+func (s *State) CountEntries() error {
+	count, err := s.DB.CountAllEntries(context.Background())
+	if err != nil {
+		return fmt.Errorf("Couldn't get amount: %w", err)
+	}
+
+	fmt.Printf("There's total of %d lessons you have learned so far!\n", count)
+
+	return nil
+}
+
 func printEntry(entry database.Entry) {
 	
     fmt.Printf("--- Entry #%d ---\n", entry.ID)

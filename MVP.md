@@ -169,5 +169,5 @@ If nothing is due:
 7. [x] Can review each, bubbletea and cli
 8. [x] view specific entry 
 9. [] multiple delete flags / delete all
-10.[] search by tags
+10.[x] search by tags
 11.[] Implement tui as a whole 
