@@ -5,7 +5,8 @@ Copyright © 2026 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
-
+	"fmt"
+	"strconv"
 	"github.com/spf13/cobra"
 )
 
@@ -21,12 +22,24 @@ This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Args: cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		idFlag, _ := cmd.Flags().GetString("id")
+ 
+		if idFlag != "" {
+			id, err := strconv.ParseInt(idFlag, 10, 64)
+			if err != nil {
+				return fmt.Errorf("invalid ID %q — must be a number", idFlag)
+			}
+			return appState.GetSpecificEntry(id)
+		}
+ 
 		return appState.ListEntry()
+
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(listCmd)
+	listCmd.Flags().StringP("id", "i", "", "View a specific entry by ID (e.g. til list -i 5)")
 
 	// Here you will define your flags and configuration settings.
 

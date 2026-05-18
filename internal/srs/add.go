@@ -9,7 +9,7 @@ import (
 
 func (s *State) AddEntry(entry string, tag string) error {
 	if entry == "" || tag == "" {
-		return fmt.Errorf("Body and Tag is required")
+		fmt.Errorf("Body and Tag is required")
 	} 
 
 	_, err := s.DB.CreateEntry(context.Background(), database.CreateEntryParams{

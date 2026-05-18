@@ -25,6 +25,18 @@ func (s *State) ListEntry() error {
     return nil
 }
 
+func (s *State) GetSpecificEntry(id int64) error {
+	entry, err := s.DB.GetEntryByID(context.Background(), id)
+	if err != nil {
+		fmt.Printf("Entry [#%d] does not exist.\n", id)
+		return nil
+	}
+
+	printEntry(entry)	
+
+	return nil
+}
+
 func printEntry(entry database.Entry) {
 	
     fmt.Printf("--- Entry #%d ---\n", entry.ID)

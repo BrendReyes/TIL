@@ -12,7 +12,8 @@ import (
 func (s *State) EditEntry(id int64) error {
 	entry, err := s.DB.GetEntry(context.Background(), id)
 	if err != nil {
-		return fmt.Errorf("[#%d] Does not exist: %w", id, err)
+		fmt.Printf("Entry [#%d] Does not exist.\n", id)
+		return nil
 	}
 
 	// Calling the TUI Editor goes here

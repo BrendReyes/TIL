@@ -12,7 +12,7 @@ RETURNING *;
 -- name: ListAllEntry :many
 SELECT * FROM entries;
 
--- name: DeleteEntry :exec
+-- name: DeleteEntry :execresult
 DELETE FROM entries
 WHERE id = ?;
 
@@ -38,4 +38,8 @@ SET last_reviewed_at     = ?,
     review_interval_days = ?,
     ease_factor          = ?,
     review_count         = ?
+WHERE id = ?;
+
+-- name: GetEntryByID :one
+SELECT * FROM entries
 WHERE id = ?;

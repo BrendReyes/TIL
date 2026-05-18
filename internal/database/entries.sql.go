@@ -7,6 +7,7 @@ package database
 
 import (
 	"context"
+	"database/sql"
 	"time"
 )
 
@@ -53,14 +54,13 @@ func (q *Queries) CreateEntry(ctx context.Context, arg CreateEntryParams) (Entry
 	return i, err
 }
 
-const deleteEntry = `-- name: DeleteEntry :exec
+const deleteEntry = `-- name: DeleteEntry :execresult
 DELETE FROM entries
 WHERE id = ?
 `
 
-func (q *Queries) DeleteEntry(ctx context.Context, id int64) error {
-	_, err := q.db.ExecContext(ctx, deleteEntry, id)
-	return err
+func (q *Queries) DeleteEntry(ctx context.Context, id int64) (sql.Result, error) {
+	return q.db.ExecContext(ctx, deleteEntry, id)
 }
 
 const editEntry = `-- name: EditEntry :exec
@@ -134,6 +134,28 @@ WHERE id = ?
 
 func (q *Queries) GetEntry(ctx context.Context, id int64) (Entry, error) {
 	row := q.db.QueryRowContext(ctx, getEntry, id)
+	var i Entry
+	err := row.Scan(
+		&i.ID,
+		&i.Body,
+		&i.Tag,
+		&i.CreatedAt,
+		&i.LastReviewedAt,
+		&i.ReviewIntervalDays,
+		&i.ReviewCount,
+		&i.EaseFactor,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getEntryByID = `-- name: GetEntryByID :one
+SELECT id, body, tag, created_at, last_reviewed_at, review_interval_days, review_count, ease_factor, updated_at FROM entries
+WHERE id = ?
+`
+
+func (q *Queries) GetEntryByID(ctx context.Context, id int64) (Entry, error) {
+	row := q.db.QueryRowContext(ctx, getEntryByID, id)
 	var i Entry
 	err := row.Scan(
 		&i.ID,

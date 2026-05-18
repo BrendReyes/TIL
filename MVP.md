@@ -167,6 +167,7 @@ If nothing is due:
 5. [x] Can view all entries
 6. [x] Can edit using tui bubbletea
 7. [x] Can review each, bubbletea and cli
-8. [] view specific entry 
-9. [] multiple delete flags
+8. [x] view specific entry 
+9. [] multiple delete flags / delete all
+10.[] search by tags
 10. [] Implement tui as a whole 
