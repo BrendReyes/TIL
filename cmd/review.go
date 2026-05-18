@@ -16,6 +16,7 @@ var reviewCmd = &cobra.Command{
 	Short: "Start an interactive review session",
 	Long: `Launch the interactive TUI to review entries that are due for a revisit.
 It is just a simple recalling, no question and answers, but uses similar algorithm what Anki uses`,
+	DisableFlagsInUseLine: true,
 	Args: cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return appState.ReviewEntries()

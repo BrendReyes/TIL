@@ -13,7 +13,7 @@ func (s *State) ListEntry() error {
 	}
 
 	if len(entries) == 0 {
-    	fmt.Println("No entries found. Use 'til add <body> -t <tag>' to start.")
+    	fmt.Println("No entries found.\nUse 'til add <body> -t <tag>' to start.")
     	return nil
 	}
 

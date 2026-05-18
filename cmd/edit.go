@@ -18,6 +18,7 @@ var editCmd = &cobra.Command{
 
 Use this to fix typos, update tags, or expand on your notes as your
 understanding of the topic evolves.`,
+	DisableFlagsInUseLine: true,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		id, err := strconv.ParseInt(args[0], 10, 64)

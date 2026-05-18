@@ -16,8 +16,12 @@ var listCmd = &cobra.Command{
 	Short: "Display entries or view a specific one",
 	Long: `Display a summarized table of all captured learning entries.
    
-To view the full content and metadata of a specific entry, use the --id flag:
-til list --id 42`,
+Examples:
+  til list (displays all)
+  til list --tag postgres
+  til list -t algorithms
+  til list --id 5
+  til list -i 3`,
 	Args: cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		idFlag, _ := cmd.Flags().GetString("id")

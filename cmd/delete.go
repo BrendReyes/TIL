@@ -16,6 +16,8 @@ var deleteCmd = &cobra.Command{
 	Use:   `delete all or delete <id>`,
 	Short: "Delete an entry",
 	Long: `Permanently remove entry from the storage
+
+Example
   til delete all
   til delete 5
 	`,
