@@ -21,7 +21,7 @@ var addCmd = &cobra.Command{
    
 Example:
   til add "In Go, defer runs LIFO" --tag go
-  til add "BFS uses a queue, DFS uses a stack" -t algorithms`,
+  til add BFS uses a queue, DFS uses a stack -t algorithms`,
 
 	Args: cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {

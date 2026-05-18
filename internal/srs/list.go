@@ -40,16 +40,10 @@ func printEntry(entry database.Entry) {
 	
     fmt.Printf("--- Entry #%d ---\n", entry.ID)
     fmt.Printf("  Body:             %s\n", entry.Body)
-
     fmt.Printf("  Tag:              %s\n", entry.Tag)
-
     fmt.Printf("  Created:          %s\n", entry.CreatedAt.Format("2006-01-02 15:04:05"))
-
-
     fmt.Printf("  Last Reviewed:    %s\n", entry.LastReviewedAt.Format("2006-01-02 15:04:05"))
-
-
-    fmt.Printf("  Review Interval:  %d days\n", entry.ReviewIntervalDays)
+    //fmt.Printf("  Review Interval:  %d days\n", entry.ReviewIntervalDays)
     fmt.Printf("  Review Count:     %d\n", entry.ReviewCount)
     fmt.Println("----------------")
 }

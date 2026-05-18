@@ -9,9 +9,16 @@ import (
 
 func (s *State) AddEntry(entry string, tag string) error {
 	if entry == "" || tag == "" {
-		fmt.Errorf("Body and Tag is required.")
-		return nil
-	} 
+		return fmt.Errorf("Body or Tag cannot be empty.")
+	}
+	
+	if len(entry) > 800 {
+		return fmt.Errorf("800 characters exceeded....")
+	}
+
+	if len(tag) > 100 {
+		return fmt.Errorf("100 characters exceeded....")
+	}
 
 	_, err := s.DB.CreateEntry(context.Background(), database.CreateEntryParams{
 		Body: entry,

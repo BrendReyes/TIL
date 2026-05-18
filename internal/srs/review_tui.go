@@ -77,7 +77,6 @@ func (m *reviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c", "q", "esc":
 			return m, tea.Quit
 
-		// Reveal answer, then on second press submit the selected score
 		case "enter", " ":
 			if !m.showAnswer {
 				m.showAnswer = true
@@ -199,7 +198,7 @@ func (m *reviewModel) View() string {
 
 	var controls string
 	if !m.showAnswer {
-		controls = reviewHelpStyle.Render("enter: reveal • q: quit")
+		controls = reviewHelpStyle.Render("enter: continue • q: quit")
 	} else {
 		scores := []string{"Again", "Hard", "Good", "Easy"}
 		var scoreButtons []string

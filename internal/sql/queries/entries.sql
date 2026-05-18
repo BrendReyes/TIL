@@ -45,3 +45,7 @@ WHERE id = ?;
 -- name: GetEntryByID :one
 SELECT * FROM entries
 WHERE id = ?;
+
+-- name: ListEntryByTag
+SELECT * FROM entries
+WHERE tag = ?;

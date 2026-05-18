@@ -170,4 +170,4 @@ If nothing is due:
 8. [x] view specific entry 
 9. [] multiple delete flags / delete all
 10.[] search by tags
-10. [] Implement tui as a whole 
+11.[] Implement tui as a whole 
