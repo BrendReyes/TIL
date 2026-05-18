@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 	"strings"
-	"database/sql"
 	"github.com/brendreyes/til/internal/database"
 )
+
 
 func (s *State) EditEntry(id int64) error {
 	entry, err := s.DB.GetEntry(context.Background(), id)
@@ -16,11 +16,7 @@ func (s *State) EditEntry(id int64) error {
 	}
 
 	// Calling the TUI Editor goes here
-	currentTag := ""
-	if entry.Tag.Valid {
-		currentTag = entry.Tag.String
-	}
-	newBody, newTag, saved, err := RunEditor(entry.Body, currentTag)
+	newBody, newTag, saved, err := RunEditor(entry.Body, entry.Tag)
 	if err != nil {
 	    return err
 	}
@@ -31,18 +27,19 @@ func (s *State) EditEntry(id int64) error {
 
 	newBody = strings.TrimSpace(newBody)
 	newTag = strings.TrimSpace(newTag)
-	if newBody == strings.TrimSpace(entry.Body) && newTag == currentTag {
+	if newBody == strings.TrimSpace(entry.Body) && newTag == entry.Tag {
 	    fmt.Println("No changes detected...")
 	    return nil
+	}
+
+	if newBody == "" || newTag == "" {
+		return fmt.Errorf("Body and Tag is required")
 	}
 
 	err = s.DB.EditEntry(context.Background(), database.EditEntryParams{
 		ID:   id,
 		Body: newBody,
-		Tag:  sql.NullString{
-			String: newTag, 
-			Valid: newTag != "",
-		},
+		Tag:  newTag,
 		UpdatedAt: time.Now().UTC(),
 	})
 

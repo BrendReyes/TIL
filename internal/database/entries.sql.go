@@ -7,7 +7,6 @@ package database
 
 import (
 	"context"
-	"database/sql"
 	"time"
 )
 
@@ -25,7 +24,7 @@ RETURNING id, body, tag, created_at, last_reviewed_at, review_interval_days, rev
 
 type CreateEntryParams struct {
 	Body           string
-	Tag            sql.NullString
+	Tag            string
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 	LastReviewedAt time.Time
@@ -72,7 +71,7 @@ WHERE id = ?
 
 type EditEntryParams struct {
 	Body      string
-	Tag       sql.NullString
+	Tag       string
 	UpdatedAt time.Time
 	ID        int64
 }

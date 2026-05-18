@@ -31,6 +31,8 @@ var addCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(addCmd)
 	addCmd.Flags().StringP("tag", "t", "", "Tag to categorize this entry (e.g. -t algorithms)")
+	addCmd.MarkFlagRequired("tag")
+
 
 	// Here you will define your flags and configuration settings.
 

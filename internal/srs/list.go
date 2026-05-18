@@ -30,11 +30,7 @@ func printEntry(entry database.Entry) {
     fmt.Printf("--- Entry #%d ---\n", entry.ID)
     fmt.Printf("  Body:             %s\n", entry.Body)
 
-    if entry.Tag.Valid {
-        fmt.Printf("  Tag:              %s\n", entry.Tag.String)
-    } else {
-        fmt.Printf("  Tag:              (none)\n")
-    }
+    fmt.Printf("  Tag:              %s\n", entry.Tag)
 
     fmt.Printf("  Created:          %s\n", entry.CreatedAt.Format("2006-01-02 15:04:05"))
 

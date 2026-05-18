@@ -3,24 +3,18 @@ package srs
 import (
 	"context"
 	"fmt"
-	"database/sql"
 	"time"
 	"github.com/brendreyes/til/internal/database"
 )
 
 func (s *State) AddEntry(entry string, tag string) error {
-	var nullTag sql.NullString
+	if entry == "" || tag == "" {
+		return fmt.Errorf("Body and Tag is required")
+	} 
 
-    if tag != "" {
-        nullTag = sql.NullString{
-			String: tag, 
-			Valid: true,
-		}
-    }
-	
 	_, err := s.DB.CreateEntry(context.Background(), database.CreateEntryParams{
 		Body: entry,
-		Tag:  nullTag,
+		Tag:  tag,
 		CreatedAt: time.Now().UTC(),
 		UpdatedAt: time.Now().UTC(),
 		LastReviewedAt: time.Now().UTC(),

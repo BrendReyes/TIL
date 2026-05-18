@@ -15,11 +15,11 @@ var (
 	focusedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 	blurredStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
 	errorStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Bold(true).MarginBottom(1)
-	
+
 	focusedBorderStyle = lipgloss.NewStyle().
 				Border(lipgloss.RoundedBorder()).
 				BorderForeground(lipgloss.Color("205"))
-	
+
 	blurredBorderStyle = lipgloss.NewStyle().
 				Border(lipgloss.RoundedBorder()).
 				BorderForeground(lipgloss.Color("240"))
@@ -53,7 +53,7 @@ func RunEditor(initialBody, initialTag string) (string, string, bool, error) {
 	ta.SetHeight(5)
 
 	ti := textinput.New()
-	ti.Placeholder = "(optional)"
+	ti.Placeholder = "e.g. go, sql, algorithms"
 	ti.SetValue(initialTag)
 	ti.CharLimit = 100
 	ti.Width = 30
@@ -78,12 +78,22 @@ func (m model) Init() bubbletea.Cmd {
 	return textarea.Blink
 }
 
+// validate checks both fields and returns the first error found, or nil.
+func (m model) validate() error {
+	if strings.TrimSpace(m.bodyInput.Value()) == "" {
+		return fmt.Errorf("Error: Body cannot be empty")
+	}
+	if strings.TrimSpace(m.tagInput.Value()) == "" {
+		return fmt.Errorf("Error: Tag cannot be empty")
+	}
+	return nil
+}
+
 func (m model) Update(msg bubbletea.Msg) (bubbletea.Model, bubbletea.Cmd) {
 	var cmds []bubbletea.Cmd
 
 	switch msg := msg.(type) {
 	case bubbletea.KeyMsg:
-		// Clear any existing error when the user starts typing or moving
 		m.err = nil
 
 		switch msg.String() {
@@ -92,17 +102,18 @@ func (m model) Update(msg bubbletea.Msg) (bubbletea.Model, bubbletea.Cmd) {
 			return m, bubbletea.Quit
 
 		case "ctrl+s", "ctrl+enter":
-			if strings.TrimSpace(m.bodyInput.Value()) == "" {
-				m.err = fmt.Errorf("Error: Body cannot be empty")
+			if err := m.validate(); err != nil {
+				m.err = err
 				return m, nil
 			}
 			m.saved = true
 			return m, bubbletea.Quit
 
 		case "enter":
+			// Enter on the tag field attempts to save
 			if m.focus == 1 {
-				if strings.TrimSpace(m.bodyInput.Value()) == "" {
-					m.err = fmt.Errorf("Error: Body cannot be empty")
+				if err := m.validate(); err != nil {
+					m.err = err
 					return m, nil
 				}
 				m.saved = true
@@ -139,7 +150,7 @@ func (m model) View() string {
 	}
 
 	bodyLabel := "Learning Entry"
-	tagLabel := "Tags"
+	tagLabel := "Tag (required)"
 	var bodyView, tagView string
 
 	if m.focus == 0 {
@@ -154,7 +165,6 @@ func (m model) View() string {
 		tagView = focusedBorderStyle.Render(m.tagInput.View())
 	}
 
-	// Prepare error display
 	errDisplay := ""
 	if m.err != nil {
 		errDisplay = errorStyle.Render(m.err.Error())
@@ -169,7 +179,7 @@ func (m model) View() string {
 		"",
 		tagLabel,
 		tagView,
-		helpStyle.Render("tab: switch • enter: save (on tags) • ctrl+s: save • esc: cancel"),
+		helpStyle.Render("tab: switch • enter: save (on tag) • ctrl+s: save • esc: cancel"),
 	)
 
 	return docStyle.Render(s)

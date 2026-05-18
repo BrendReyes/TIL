@@ -43,7 +43,6 @@ var (
 				MarginRight(1)
 )
 
-// reviewUpdatedMsg is sent back to the Update loop when a DB write completes.
 type reviewUpdatedMsg struct{ err error }
 
 type reviewModel struct {
@@ -175,8 +174,8 @@ func (m *reviewModel) View() string {
 	header := reviewTitleStyle.Render(fmt.Sprintf("Reviewing %d of %d", m.currentIndex+1, len(m.entries)))
 
 	var tagView string
-	if entry.Tag.Valid && entry.Tag.String != "" {
-		tagView = reviewFocusedStyle.Render("● " + entry.Tag.String)
+	if entry.Tag != "" {
+    tagView = reviewFocusedStyle.Render("● " + entry.Tag)
 	} else {
 		tagView = reviewBlurredStyle.Render("○ no tags")
 	}
