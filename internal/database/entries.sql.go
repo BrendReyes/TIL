@@ -127,6 +127,44 @@ func (q *Queries) GetDueEntries(ctx context.Context) ([]Entry, error) {
 	return items, nil
 }
 
+const getEntriesByTag = `-- name: GetEntriesByTag :many
+SELECT id, body, tag, created_at, last_reviewed_at, review_interval_days, review_count, ease_factor, updated_at FROM entries
+WHERE tag = ?
+`
+
+func (q *Queries) GetEntriesByTag(ctx context.Context, tag string) ([]Entry, error) {
+	rows, err := q.db.QueryContext(ctx, getEntriesByTag, tag)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Entry
+	for rows.Next() {
+		var i Entry
+		if err := rows.Scan(
+			&i.ID,
+			&i.Body,
+			&i.Tag,
+			&i.CreatedAt,
+			&i.LastReviewedAt,
+			&i.ReviewIntervalDays,
+			&i.ReviewCount,
+			&i.EaseFactor,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getEntry = `-- name: GetEntry :one
 SELECT id, body, tag, created_at, last_reviewed_at, review_interval_days, review_count, ease_factor, updated_at FROM entries
 WHERE id = ?

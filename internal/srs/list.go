@@ -36,6 +36,20 @@ func (s *State) GetSpecificEntry(id int64) error {
 	return nil
 }
 
+func (s *State) ListEntriesByTag(tag string) error {
+	entries, err := s.DB.GetEntriesByTag(context.Background(), tag)
+	if err != nil {
+		fmt.Printf("No entries found with '%s' tag\n", tag)
+		return nil
+	}
+
+	for _, entry := range entries {
+		printEntry(entry)	
+	}
+
+	return nil
+}
+
 func printEntry(entry database.Entry) {
 	
     fmt.Printf("--- Entry #%d ---\n", entry.ID)

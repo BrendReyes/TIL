@@ -21,13 +21,18 @@ til list --id 42`,
 	Args: cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		idFlag, _ := cmd.Flags().GetString("id")
- 
+		tagFlag, _ := cmd.Flags().GetString("tag")
+
 		if idFlag != "" {
 			id, err := strconv.ParseInt(idFlag, 10, 64)
 			if err != nil {
 				return fmt.Errorf("invalid ID %q — must be a number", idFlag)
 			}
 			return appState.GetSpecificEntry(id)
+		}
+
+		if tagFlag != "" {
+			return appState.ListEntriesByTag(tagFlag)
 		}
  
 		return appState.ListEntry()
@@ -38,14 +43,7 @@ til list --id 42`,
 func init() {
 	rootCmd.AddCommand(listCmd)
 	listCmd.Flags().StringP("id", "i", "", "View a specific entry by ID (e.g. til list -i 5)")
+	listCmd.Flags().StringP("tag", "t", "", "List all entries by tags (e.g. til list -t postgres)")
 
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// listCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// listCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	listCmd.MarkFlagsMutuallyExclusive("id", "tag")
 }
