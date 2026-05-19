@@ -49,3 +49,21 @@ func (s *State) RemoveAllEntry() error {
     fmt.Printf("%d entries deleted\n", rowsDeleted)
     return nil
 }
+
+func (s *State) RemoveEntryByTag(tag string) error {
+	fmt.Printf("All entries with '%s' tag will be permanently deleted. Are you sure? [y/N] ", tag)
+	var confirm string
+	fmt.Scanln(&confirm)
+	if confirm != "y" && confirm != "Y" {
+		fmt.Println("Delete aborted.")
+		return nil
+	}
+
+    rowsDeleted, err := s.DB.DeleteEntriesByTag(context.Background(), tag)
+    if err != nil {
+        return fmt.Errorf("couldn't delete entries: %w", err)
+    }
+
+    fmt.Printf("%d entries deleted from '%s' tag\n", rowsDeleted, tag)
+    return nil
+}

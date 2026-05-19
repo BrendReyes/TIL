@@ -10,7 +10,7 @@ import (
 
 
 func (s *State) EditEntry(id int64) error {
-	entry, err := s.DB.GetEntry(context.Background(), id)
+	entry, err := s.DB.GetEntryByID(context.Background(), id)
 	if err != nil {
 		fmt.Printf("Entry [#%d] Does not exist.\n", id)
 		return nil

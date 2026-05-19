@@ -168,12 +168,12 @@ If nothing is due:
 6. [x] Can edit using tui bubbletea
 7. [x] Can review each, bubbletea and cli
 8. [x] view specific entry 
-9. [] custom delete flags 
 10.[x] delete all
 11.[x] list by tags
-12.[] sorting flags in list
-13.[] Root tui
-14.[] Tui for add
-15.[] Tui for delete
-16.[] Tui for list
-17.[] Tui as a whole
+13.[x] delete by tag
+14.[] Root tui
+15.[x] stats command
+16.[] Tui for add and implement it on 'til add'
+17.[] Tui for delete
+18.[] Tui for list
+19.[] Tui as a whole

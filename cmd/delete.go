@@ -20,10 +20,16 @@ var deleteCmd = &cobra.Command{
 Example
   til delete all
   til delete 5
+  til delete all -t python
+  til delete all --tag "system design"
 	`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if strings.ToLower(args[0]) == "all" {
+			tag, _ := cmd.Flags().GetString("tag")
+			if tag != "" {
+				return appState.RemoveEntryByTag(tag)
+			}
 			return appState.RemoveAllEntry()
 		}
 
@@ -38,6 +44,7 @@ Example
 
 func init() {
 	rootCmd.AddCommand(deleteCmd)
+	deleteCmd.Flags().StringP("tag", "t", "", "Delete all entries by tag (e.g til delete all -t sql)")
 	// Here you will define your flags and configuration settings.
 
 	// Cobra supports Persistent Flags which will work for this command

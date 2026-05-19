@@ -10,7 +10,21 @@ VALUES (
 RETURNING *;
 
 -- name: ListAllEntry :many
-SELECT * FROM entries;
+SELECT * FROM entries
+ORDER BY created_at DESC;;
+
+-- name: ListEntryPaginated :many
+SELECT * FROM entries
+ORDER BY created_at DESC
+LIMIT ? OFFSET ?;
+
+-- name: GetEntryByID :one
+SELECT * FROM entries
+WHERE id = ?;
+
+-- name: GetEntriesByTag :many
+SELECT * FROM entries
+WHERE LOWER(TRIM(tag)) = LOWER(TRIM(?));
 
 -- name: CountAllEntries :one
 SELECT COUNT(*) FROM entries;
@@ -22,9 +36,9 @@ WHERE id = ?;
 -- name: DeleteAllEntries :execrows
 DELETE FROM entries;
 
--- name: GetEntry :one
-SELECT * FROM entries
-WHERE id = ?;
+-- name: DeleteEntriesByTag :execrows
+DELETE FROM entries
+WHERE LOWER(TRIM(tag)) = LOWER(TRIM(?));
 
 -- name: EditEntry :exec
 UPDATE entries
@@ -34,8 +48,10 @@ WHERE id = ?;
 -- name: GetDueEntries :many
 SELECT *
 FROM entries
-WHERE review_count = 0
-   OR datetime(last_reviewed_at, '+' || review_interval_days || ' days') <= datetime('now')
+WHERE (
+    review_count = 0
+    OR datetime(last_reviewed_at, '+' || review_interval_days || ' days') <= datetime('now')
+)
 ORDER BY review_count ASC, last_reviewed_at ASC;
 
 -- name: UpdateReview :exec
@@ -46,10 +62,23 @@ SET last_reviewed_at     = ?,
     review_count         = ?
 WHERE id = ?;
 
--- name: GetEntryByID :one
-SELECT * FROM entries
-WHERE id = ?;
+-- name: CountEntriesByTag :many
+SELECT tag, COUNT(*) AS count
+FROM entries
+GROUP BY tag
+ORDER BY count DESC;
 
--- name: GetEntriesByTag :many
-SELECT * FROM entries
-WHERE tag = ?;
+-- name: CountDueEntries :one
+SELECT COUNT(*) FROM entries
+WHERE (
+    review_count = 0
+    OR datetime(last_reviewed_at, '+' || review_interval_days || ' days') <= datetime('now')
+);
+
+-- name: CountReviewedEntries :one
+SELECT COUNT(*) FROM entries
+WHERE review_count > 0;
+
+-- name: CountUnreviewedEntries :one
+SELECT COUNT(*) FROM entries
+WHERE review_count = 0;

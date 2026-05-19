@@ -22,6 +22,80 @@ func (q *Queries) CountAllEntries(ctx context.Context) (int64, error) {
 	return count, err
 }
 
+const countDueEntries = `-- name: CountDueEntries :one
+SELECT COUNT(*) FROM entries
+WHERE (
+    review_count = 0
+    OR datetime(last_reviewed_at, '+' || review_interval_days || ' days') <= datetime('now')
+)
+`
+
+func (q *Queries) CountDueEntries(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countDueEntries)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countEntriesByTag = `-- name: CountEntriesByTag :many
+SELECT tag, COUNT(*) AS count
+FROM entries
+GROUP BY tag
+ORDER BY count DESC
+`
+
+type CountEntriesByTagRow struct {
+	Tag   string
+	Count int64
+}
+
+func (q *Queries) CountEntriesByTag(ctx context.Context) ([]CountEntriesByTagRow, error) {
+	rows, err := q.db.QueryContext(ctx, countEntriesByTag)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CountEntriesByTagRow
+	for rows.Next() {
+		var i CountEntriesByTagRow
+		if err := rows.Scan(&i.Tag, &i.Count); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const countReviewedEntries = `-- name: CountReviewedEntries :one
+SELECT COUNT(*) FROM entries
+WHERE review_count > 0
+`
+
+func (q *Queries) CountReviewedEntries(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countReviewedEntries)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countUnreviewedEntries = `-- name: CountUnreviewedEntries :one
+SELECT COUNT(*) FROM entries
+WHERE review_count = 0
+`
+
+func (q *Queries) CountUnreviewedEntries(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countUnreviewedEntries)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createEntry = `-- name: CreateEntry :one
 INSERT INTO entries (body, tag, created_at, updated_at, last_reviewed_at) 
 VALUES (
@@ -77,6 +151,19 @@ func (q *Queries) DeleteAllEntries(ctx context.Context) (int64, error) {
 	return result.RowsAffected()
 }
 
+const deleteEntriesByTag = `-- name: DeleteEntriesByTag :execrows
+DELETE FROM entries
+WHERE LOWER(TRIM(tag)) = LOWER(TRIM(?))
+`
+
+func (q *Queries) DeleteEntriesByTag(ctx context.Context, trim string) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteEntriesByTag, trim)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const deleteEntry = `-- name: DeleteEntry :execresult
 DELETE FROM entries
 WHERE id = ?
@@ -112,8 +199,10 @@ func (q *Queries) EditEntry(ctx context.Context, arg EditEntryParams) error {
 const getDueEntries = `-- name: GetDueEntries :many
 SELECT id, body, tag, created_at, last_reviewed_at, review_interval_days, review_count, ease_factor, updated_at
 FROM entries
-WHERE review_count = 0
-   OR datetime(last_reviewed_at, '+' || review_interval_days || ' days') <= datetime('now')
+WHERE (
+    review_count = 0
+    OR datetime(last_reviewed_at, '+' || review_interval_days || ' days') <= datetime('now')
+)
 ORDER BY review_count ASC, last_reviewed_at ASC
 `
 
@@ -152,11 +241,11 @@ func (q *Queries) GetDueEntries(ctx context.Context) ([]Entry, error) {
 
 const getEntriesByTag = `-- name: GetEntriesByTag :many
 SELECT id, body, tag, created_at, last_reviewed_at, review_interval_days, review_count, ease_factor, updated_at FROM entries
-WHERE tag = ?
+WHERE LOWER(TRIM(tag)) = LOWER(TRIM(?))
 `
 
-func (q *Queries) GetEntriesByTag(ctx context.Context, tag string) ([]Entry, error) {
-	rows, err := q.db.QueryContext(ctx, getEntriesByTag, tag)
+func (q *Queries) GetEntriesByTag(ctx context.Context, trim string) ([]Entry, error) {
+	rows, err := q.db.QueryContext(ctx, getEntriesByTag, trim)
 	if err != nil {
 		return nil, err
 	}
@@ -188,28 +277,6 @@ func (q *Queries) GetEntriesByTag(ctx context.Context, tag string) ([]Entry, err
 	return items, nil
 }
 
-const getEntry = `-- name: GetEntry :one
-SELECT id, body, tag, created_at, last_reviewed_at, review_interval_days, review_count, ease_factor, updated_at FROM entries
-WHERE id = ?
-`
-
-func (q *Queries) GetEntry(ctx context.Context, id int64) (Entry, error) {
-	row := q.db.QueryRowContext(ctx, getEntry, id)
-	var i Entry
-	err := row.Scan(
-		&i.ID,
-		&i.Body,
-		&i.Tag,
-		&i.CreatedAt,
-		&i.LastReviewedAt,
-		&i.ReviewIntervalDays,
-		&i.ReviewCount,
-		&i.EaseFactor,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
 const getEntryByID = `-- name: GetEntryByID :one
 SELECT id, body, tag, created_at, last_reviewed_at, review_interval_days, review_count, ease_factor, updated_at FROM entries
 WHERE id = ?
@@ -234,10 +301,57 @@ func (q *Queries) GetEntryByID(ctx context.Context, id int64) (Entry, error) {
 
 const listAllEntry = `-- name: ListAllEntry :many
 SELECT id, body, tag, created_at, last_reviewed_at, review_interval_days, review_count, ease_factor, updated_at FROM entries
+ORDER BY created_at DESC
 `
 
 func (q *Queries) ListAllEntry(ctx context.Context) ([]Entry, error) {
 	rows, err := q.db.QueryContext(ctx, listAllEntry)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Entry
+	for rows.Next() {
+		var i Entry
+		if err := rows.Scan(
+			&i.ID,
+			&i.Body,
+			&i.Tag,
+			&i.CreatedAt,
+			&i.LastReviewedAt,
+			&i.ReviewIntervalDays,
+			&i.ReviewCount,
+			&i.EaseFactor,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listEntryPaginated = `-- name: ListEntryPaginated :many
+;
+
+SELECT id, body, tag, created_at, last_reviewed_at, review_interval_days, review_count, ease_factor, updated_at FROM entries
+ORDER BY created_at DESC
+LIMIT ? OFFSET ?
+`
+
+type ListEntryPaginatedParams struct {
+	Limit  int64
+	Offset int64
+}
+
+func (q *Queries) ListEntryPaginated(ctx context.Context, arg ListEntryPaginatedParams) ([]Entry, error) {
+	rows, err := q.db.QueryContext(ctx, listEntryPaginated, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
