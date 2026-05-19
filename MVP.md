@@ -149,11 +149,13 @@ If nothing is due:
 ---
 
 
-## Out of Scope for MVP
+## Out of Scope for MVP but nice for later
 
 1. Search 
 2. Reminders | "You have N entries overdue"
 3. Export / import | JSON dump of `entries` + `tags` is straightforward |
+4. Filter / sort / pagination
+5. Tag selection menu (need this for consistent sorting and filtering)
 
 ---
 
@@ -161,3 +163,17 @@ If nothing is due:
 1. [x] Download and import the necessary tools and libraries for cli and tui
 2. [x] Initialize SQLite
 3. [x] Create the table schema using goose migrations
+4. [x] Can add entry (basic)
+5. [x] Can view all entries
+6. [x] Can edit using tui bubbletea
+7. [x] Can review each, bubbletea and cli
+8. [x] view specific entry 
+10.[x] delete all
+11.[x] list by tags
+13.[x] delete by tag
+14.[] Root tui
+15.[x] stats command
+16.[] Tui for add and implement it on 'til add'
+17.[] Tui for delete
+18.[] Tui for list
+19.[] Tui as a whole

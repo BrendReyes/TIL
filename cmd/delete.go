@@ -6,28 +6,45 @@ package cmd
 
 import (
 	"fmt"
-
+	"strconv"
+	"strings"
 	"github.com/spf13/cobra"
 )
 
 // deleteCmd represents the delete command
 var deleteCmd = &cobra.Command{
-	Use:   "delete",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
+	Use:   `delete all or delete <id>`,
+	Short: "Delete an entry",
+	Long: `Permanently remove entry from the storage
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("delete called")
+Example
+  til delete all
+  til delete 5
+  til delete all -t python
+  til delete all --tag "system design"
+	`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if strings.ToLower(args[0]) == "all" {
+			tag, _ := cmd.Flags().GetString("tag")
+			if tag != "" {
+				return appState.RemoveEntryByTag(tag)
+			}
+			return appState.RemoveAllEntry()
+		}
+
+		id, err := strconv.ParseInt(args[0], 10, 64)
+        if err != nil {
+            return fmt.Errorf("invalid ID %q — must be a valid id", args[0])
+        }
+		
+        return appState.DeleteEntry(id)
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(deleteCmd)
-
+	deleteCmd.Flags().StringP("tag", "t", "", "Delete all entries by tag (e.g til delete all -t sql)")
 	// Here you will define your flags and configuration settings.
 
 	// Cobra supports Persistent Flags which will work for this command

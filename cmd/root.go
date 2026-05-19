@@ -5,30 +5,42 @@ Copyright © 2026 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
+	"fmt"
 	"os"
-
+	"github.com/brendreyes/til/internal/srs"
 	"github.com/spf13/cobra"
 )
 
+var appState *srs.State
 
+func SetState(s *srs.State) {
+	appState = s
+}
+
+const art = `
+██╗ ████████╗    ██╗    ██╗                          
+╚██╗╚══██╔══╝    ██║    ██║                          
+ ╚██╗  ██║       ██║    ██║                          
+ ██╔╝  ██║       ██║    ██║                          
+██╔╝   ██║       ██║    ███████╗    ██╗    ██╗    ██╗
+╚═╝    ╚═╝       ╚═╝    ╚══════╝    ╚═╝    ╚═╝    ╚═╝                                                                                              
+`
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "til",
-	Short: "A brief description of your application",
-	Long: `A longer description that spans multiple lines and likely contains
-examples and usage of using your application. For example:
+	Short: "A CLI tool for capturing and reviewing things you learn",
+	Long: `TIL (Today I Learned) is a personal knowledge tracker designed to help you
+retain information through spaced repetition.
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
-	// Run: func(cmd *cobra.Command, args []string) { },
+Capture insights instantly from your terminal during study sessions and
+review them later through an interactive TUI session to ensure they stick.`,
+	Run: func(cmd *cobra.Command, args []string) {
+        fmt.Printf(art)
+        cmd.Help() 
+   },
 }
 
-// Execute adds all child commands to the root command and sets flags appropriately.
-// This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
 	err := rootCmd.Execute()
 	if err != nil {
@@ -37,14 +49,7 @@ func Execute() {
 }
 
 func init() {
-	// Here you will define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
-
-	// rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.til.yaml)")
-
-	// Cobra also supports local flags, which will only run
-	// when this action is called directly.
+	rootCmd.CompletionOptions.DisableDefaultCmd = true
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 

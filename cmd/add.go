@@ -5,27 +5,37 @@ Copyright © 2026 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
-	"fmt"
-
+	//"fmt"
+	"strings"
 	"github.com/spf13/cobra"
+
 )
+
+
 
 // addCmd represents the add command
 var addCmd = &cobra.Command{
-	Use:   "add",
-	Short: "Add what you have learned",
-	Long: `Add what you have learned:
-		   til add "BFS uses a queue, DFS uses a stack"
-		   til add BFS uses a queue, DFS uses a stack
-		  `,
+	Use:   "add <content>",
+	Short: "Capture a new learning entry",
+    Long: `Add a new entry to your TIL database.
+   
+Example:
+  til add "In Go, defer runs LIFO" --tag go
+  til add BFS uses a queue, DFS uses a stack -t algorithms`,
+
+	Args: cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("add called")
-		return nil
+		content := strings.Join(args, " ")
+		tag, _ := cmd.Flags().GetString("tag")
+		return appState.AddEntry(content, tag)
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(addCmd)
+	addCmd.Flags().StringP("tag", "t", "", "Tag to categorize this entry (e.g. -t algorithms)")
+	addCmd.MarkFlagRequired("tag")
+
 
 	// Here you will define your flags and configuration settings.
 

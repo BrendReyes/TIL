@@ -5,15 +5,17 @@
 package database
 
 import (
-	"database/sql"
+	"time"
 )
 
-type Lesson struct {
+type Entry struct {
 	ID                 int64
 	Body               string
-	Tag                sql.NullString
-	CreatedAt          sql.NullTime
-	LastReviewedAt     sql.NullTime
+	Tag                string
+	CreatedAt          time.Time
+	LastReviewedAt     time.Time
 	ReviewIntervalDays int64
 	ReviewCount        int64
+	EaseFactor         float64
+	UpdatedAt          time.Time
 }
