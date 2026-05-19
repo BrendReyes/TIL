@@ -242,6 +242,7 @@ func (q *Queries) GetDueEntries(ctx context.Context) ([]Entry, error) {
 const getEntriesByTag = `-- name: GetEntriesByTag :many
 SELECT id, body, tag, created_at, last_reviewed_at, review_interval_days, review_count, ease_factor, updated_at FROM entries
 WHERE LOWER(TRIM(tag)) = LOWER(TRIM(?))
+ORDER BY id ASC
 `
 
 func (q *Queries) GetEntriesByTag(ctx context.Context, trim string) ([]Entry, error) {
@@ -301,7 +302,7 @@ func (q *Queries) GetEntryByID(ctx context.Context, id int64) (Entry, error) {
 
 const listAllEntry = `-- name: ListAllEntry :many
 SELECT id, body, tag, created_at, last_reviewed_at, review_interval_days, review_count, ease_factor, updated_at FROM entries
-ORDER BY created_at DESC
+ORDER BY id ASC
 `
 
 func (q *Queries) ListAllEntry(ctx context.Context) ([]Entry, error) {
@@ -338,10 +339,8 @@ func (q *Queries) ListAllEntry(ctx context.Context) ([]Entry, error) {
 }
 
 const listEntryPaginated = `-- name: ListEntryPaginated :many
-;
-
 SELECT id, body, tag, created_at, last_reviewed_at, review_interval_days, review_count, ease_factor, updated_at FROM entries
-ORDER BY created_at DESC
+ORDER BY id ASC
 LIMIT ? OFFSET ?
 `
 
