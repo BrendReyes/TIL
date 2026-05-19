@@ -383,6 +383,22 @@ func (q *Queries) ListEntryPaginated(ctx context.Context, arg ListEntryPaginated
 	return items, nil
 }
 
+const resetAllReviews = `-- name: ResetAllReviews :execrows
+UPDATE entries
+SET last_reviewed_at     = ?,
+    review_interval_days = 1,
+    ease_factor          = 2.5,
+    review_count         = 0
+`
+
+func (q *Queries) ResetAllReviews(ctx context.Context, lastReviewedAt time.Time) (int64, error) {
+	result, err := q.db.ExecContext(ctx, resetAllReviews, lastReviewedAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const updateReview = `-- name: UpdateReview :exec
 UPDATE entries
 SET last_reviewed_at     = ?,

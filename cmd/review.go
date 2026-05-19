@@ -19,13 +19,17 @@ It is just a simple recalling, no question and answers, but uses similar algorit
 	DisableFlagsInUseLine: true,
 	Args: cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return appState.ReviewEntries()
+		reset, _ := cmd.Flags().GetBool("reset")
+        if reset {
+            return appState.ResetAllReviews()
+        }
+        return appState.ReviewEntries()
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(reviewCmd)
-
+    reviewCmd.Flags().Bool("reset", false, "Reset all review progress so every entry becomes due immediately")
 	// Here you will define your flags and configuration settings.
 
 	// Cobra supports Persistent Flags which will work for this command

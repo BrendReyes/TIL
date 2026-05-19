@@ -74,3 +74,21 @@ func calculateNextReview(entry database.Entry, quality int) database.UpdateRevie
 		ReviewCount:        reviewCount,
 	}
 }
+
+func (s *State) ResetAllReviews() error {
+    fmt.Printf("⚠️  This will reset review progress for ALL entries. Are you sure? [y/N] ")
+    var confirm string
+    fmt.Scanln(&confirm)
+    if confirm != "y" && confirm != "Y" {
+        fmt.Println("Reset aborted.")
+        return nil
+    }
+
+    rows, err := s.DB.ResetAllReviews(context.Background(), time.Now().UTC())
+    if err != nil {
+        return fmt.Errorf("couldn't reset reviews: %w", err)
+    }
+
+    fmt.Printf("✓ Reset %d entries — everything is due for review again.\n", rows)
+    return nil
+}

@@ -82,3 +82,10 @@ WHERE review_count > 0;
 -- name: CountUnreviewedEntries :one
 SELECT COUNT(*) FROM entries
 WHERE review_count = 0;
+
+-- name: ResetAllReviews :execrows
+UPDATE entries
+SET last_reviewed_at     = ?,
+    review_interval_days = 1,
+    ease_factor          = 2.5,
+    review_count         = 0;
