@@ -43,6 +43,7 @@ Examples:
         }
 
         if tagFlag != "" {
+            
             return appState.ListEntriesByTag(tagFlag)
         }
 
