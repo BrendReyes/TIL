@@ -11,11 +11,11 @@ RETURNING *;
 
 -- name: ListAllEntry :many
 SELECT * FROM entries
-ORDER BY id;
+ORDER BY id ASC;
 
 -- name: ListEntryPaginated :many
 SELECT * FROM entries
-ORDER BY id
+ORDER BY id ASC
 LIMIT ? OFFSET ?;
 
 -- name: GetEntryByID :one
@@ -25,7 +25,7 @@ WHERE id = ?;
 -- name: GetEntriesByTag :many
 SELECT * FROM entries
 WHERE LOWER(TRIM(tag)) = LOWER(TRIM(?))
-ORDER BY id;
+ORDER BY id ASC;
 
 -- name: CountAllEntries :one
 SELECT COUNT(*) FROM entries;

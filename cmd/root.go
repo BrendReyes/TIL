@@ -1,7 +1,3 @@
-/*
-Copyright © 2026 NAME HERE <EMAIL ADDRESS>
-
-*/
 package cmd
 
 import (
@@ -26,7 +22,6 @@ const art = `
 ╚═╝    ╚═╝       ╚═╝    ╚══════╝    ╚═╝    ╚═╝    ╚═╝                                                                                              
 `
 
-// rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "til",
 	Short: "A CLI tool for capturing and reviewing things you learn",

@@ -1,14 +1,9 @@
-/*
-Copyright © 2026 NAME HERE <EMAIL ADDRESS>
-
-*/
 package cmd
 
 import (
 	"github.com/spf13/cobra"
 )
 
-// tuiCmd represents the tui command
 var tuiCmd = &cobra.Command{
 	Use:     "tui",
 	Aliases: []string{"t"},
