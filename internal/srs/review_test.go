@@ -211,3 +211,40 @@ func Test_calculateNextReview(t *testing.T) {
 		})
 	}
 }
+
+func Test_reviewModel_submitScore(t *testing.T) {
+	db := newTestDB(t)
+	entries := []database.Entry{
+		{ID: 1, Body: "test 1", Tag: "tag1", ReviewIntervalDays: 1, ReviewCount: 0, EaseFactor: 2.5},
+		{ID: 2, Body: "test 2", Tag: "tag2", ReviewIntervalDays: 1, ReviewCount: 0, EaseFactor: 2.5},
+	}
+	m := NewReviewModel(entries, db)
+
+	// Test first submission (Easy - quality 5)
+	m.selection = 3 // Easy
+	m.submitScore()
+
+	if m.currentIndex != 1 {
+		t.Errorf("expected currentIndex 1, got %d", m.currentIndex)
+	}
+	if m.reviewedCount != 1 {
+		t.Errorf("expected reviewedCount 1, got %d", m.reviewedCount)
+	}
+	if m.showAnswer {
+		t.Error("expected showAnswer to be false after submission")
+	}
+
+	// Test second submission (Again - quality 1)
+	m.selection = 0 // Again
+	m.submitScore()
+
+	if m.currentIndex != 2 {
+		t.Errorf("expected currentIndex 2, got %d", m.currentIndex)
+	}
+	if m.reviewedCount != 2 {
+		t.Errorf("expected reviewedCount 2, got %d", m.reviewedCount)
+	}
+	if !m.quitting {
+		t.Error("expected quitting to be true after last entry")
+	}
+}

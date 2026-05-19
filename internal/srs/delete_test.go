@@ -103,6 +103,18 @@ func TestState_DeleteEntry(t *testing.T) {
 			if err := s.DeleteEntry(tt.args.id); (err != nil) != tt.wantErr {
 				t.Errorf("State.DeleteEntry() error = %v, wantErr %v", err, tt.wantErr)
 			}
+
+			if tt.stdinText == "y\n" || tt.stdinText == "Y\n" {
+				_, err := s.DB.GetEntryByID(t.Context(), tt.args.id)
+				if err == nil {
+					t.Errorf("expected entry %d to be deleted, but it still exists", tt.args.id)
+				}
+			} else if tt.stdinText == "n\n" || tt.stdinText == "\n" {
+				_, err := s.DB.GetEntryByID(t.Context(), tt.args.id)
+				if err != nil {
+					t.Errorf("expected entry %d to remain, but got error: %v", tt.args.id, err)
+				}
+			}
 		})
 	}
 }
@@ -163,6 +175,13 @@ func TestState_RemoveAllEntry(t *testing.T) {
 			}
 			if err := s.RemoveAllEntry(); (err != nil) != tt.wantErr {
 				t.Errorf("State.RemoveAllEntry() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			if tt.stdinText == "y\n" {
+				count, _ := s.DB.CountAllEntries(t.Context())
+				if count != 0 {
+					t.Errorf("expected 0 entries, got %d", count)
+				}
 			}
 		})
 	}
@@ -233,6 +252,13 @@ func TestState_RemoveEntryByTag(t *testing.T) {
 			}
 			if err := s.RemoveEntryByTag(tt.args.tag); (err != nil) != tt.wantErr {
 				t.Errorf("State.RemoveEntryByTag() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			if tt.stdinText == "y\n" || tt.stdinText == "Y\n" {
+				entries, _ := s.DB.GetEntriesByTag(t.Context(), tt.args.tag)
+				if len(entries) != 0 {
+					t.Errorf("expected 0 entries with tag %q, got %d", tt.args.tag, len(entries))
+				}
 			}
 		})
 	}

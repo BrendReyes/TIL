@@ -74,8 +74,27 @@ func TestState_AddEntry(t *testing.T) {
 			s := &State{
 				DB: tt.fields.DB,
 			}
-			if err := s.AddEntry(tt.args.entry, tt.args.tag); (err != nil) != tt.wantErr {
+			err := s.AddEntry(tt.args.entry, tt.args.tag)
+			if (err != nil) != tt.wantErr {
 				t.Errorf("State.AddEntry() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			if !tt.wantErr {
+				count, _ := s.DB.CountAllEntries(t.Context())
+				if count == 0 {
+					t.Errorf("expected entry to be added to database, but count is 0")
+				}
+				entries, _ := s.DB.ListAllEntry(t.Context())
+				found := false
+				for _, e := range entries {
+					if e.Body == tt.args.entry && e.Tag == tt.args.tag {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("expected entry with body %q and tag %q not found in DB", tt.args.entry, tt.args.tag)
+				}
 			}
 		})
 	}

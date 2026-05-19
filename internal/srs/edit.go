@@ -9,6 +9,8 @@ import (
 )
 
 
+var RunEditorFunc = RunEditor
+
 func (s *State) EditEntry(id int64) error {
 	entry, err := s.DB.GetEntryByID(context.Background(), id)
 	if err != nil {
@@ -17,7 +19,7 @@ func (s *State) EditEntry(id int64) error {
 	}
 
 	// Calling the TUI Editor goes here
-	newBody, newTag, saved, err := RunEditor(entry.Body, entry.Tag)
+	newBody, newTag, saved, err := RunEditorFunc(entry.Body, entry.Tag)
 	if err != nil {
 	    return err
 	}
