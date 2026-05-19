@@ -170,8 +170,8 @@ If nothing is due:
 8. [x] view specific entry 
 9. [] custom delete flags 
 10.[x] delete all
-11.[x] search by tags
-12.[] tag and count filter in list cmd
+11.[x] list by tags
+12.[] sorting flags in list
 13.[] Root tui
 14.[] Tui for add
 15.[] Tui for delete
