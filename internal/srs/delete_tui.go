@@ -73,6 +73,7 @@ type deleteScreenModel struct {
 	entries   []database.Entry
 	loading   bool
 	err       error
+	height    int // terminal height, set from AppModel
 	cursor    int
 	page      int
 	totalPage int
@@ -122,8 +123,27 @@ func (d *deleteScreenModel) currentPageEntries() []database.Entry {
 	return d.entries[start:end]
 }
 
+func (d *deleteScreenModel) visiblePageSize() int {
+	const deleteChrome = 12
+	max := pageSize
+	if d.height > 0 {
+		avail := d.height - deleteChrome
+		if avail < 4 {
+			avail = 4
+		}
+		if avail < max {
+			max = avail
+		}
+	}
+	return max
+}
+
 func (d *deleteScreenModel) clampCursor() {
 	page := d.currentPageEntries()
+	limit := d.visiblePageSize()
+	if len(page) > limit {
+		page = page[:limit]
+	}
 	if len(page) == 0 {
 		d.cursor = 0
 		return
@@ -152,6 +172,9 @@ func deleteAllEntriesCmd(db *database.Queries) tea.Cmd {
 // ---------------------------------------------------------------------------
 
 func (a AppModel) updateDelete(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// Keep delete height in sync with terminal size.
+	a.delete.height = a.height
+
 	// Async results — handle regardless of sub-screen
 	switch ev := msg.(type) {
 	case entriesFetchedMsg:
@@ -270,6 +293,10 @@ func (a AppModel) updateDeleteList(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case "down", "j":
 		page := a.delete.currentPageEntries()
+		limit := a.delete.visiblePageSize()
+		if len(page) > limit {
+			page = page[:limit]
+		}
 		if a.delete.cursor < len(page)-1 {
 			a.delete.cursor++
 		}
@@ -383,6 +410,12 @@ func (d deleteScreenModel) viewList(title string) string {
 
 	page := d.currentPageEntries()
 
+	// Cap to visible rows so title stays on screen.
+	maxRows := d.visiblePageSize()
+	if len(page) > maxRows {
+		page = page[:maxRows]
+	}
+
 	header := listHeaderStyle.Render(fmt.Sprintf(
 		"  %-5s %-42s %-14s %s",
 		"ID", "Body", "Tag", "Created",
@@ -418,21 +451,17 @@ func (d deleteScreenModel) viewList(title string) string {
 		d.page+1, d.totalPage, len(d.entries),
 	))
 
-	warning := deleteWarningTextStyle.Render("  ⚠  Select an entry to delete it, or use the buttons below.")
-
 	bar := d.listBar.View()
 
 	var help string
 	if d.zone == zoneButtons {
-		help = appHelpStyle.Render("←/→: choose action • enter: select • tab: back to list")
+		help = appHelpStyle.Render("←/→: choose action • enter: activate • tab: back to list")
 	} else {
-		help = appHelpStyle.Render("↑/↓: navigate • enter: select to delete • ←/→: page • esc: menu")
+		help = appHelpStyle.Render("↑/↓: navigate • enter: select to delete • ←/→: page • tab: actions • esc: menu")
 	}
 
 	body := lipgloss.JoinVertical(lipgloss.Left,
 		title, "",
-		warning,
-		"",
 		header,
 		divider,
 		rows,

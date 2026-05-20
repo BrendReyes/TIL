@@ -95,6 +95,7 @@ type listScreenModel struct {
 	entries []database.Entry
 	loading bool
 	err     error
+	height  int // terminal height, set from AppModel
 
 	cursor    int // index within current page
 	page      int // 0-based page index
@@ -160,8 +161,27 @@ func (l *listScreenModel) selectedEntry() (database.Entry, bool) {
 	return page[l.cursor], true
 }
 
+func (l *listScreenModel) visiblePageSize() int {
+	const listChrome = 12
+	max := pageSize
+	if l.height > 0 {
+		avail := l.height - listChrome
+		if avail < 4 {
+			avail = 4
+		}
+		if avail < max {
+			max = avail
+		}
+	}
+	return max
+}
+
 func (l *listScreenModel) clampCursor() {
 	page := l.currentPageEntries()
+	limit := l.visiblePageSize()
+	if len(page) > limit {
+		page = page[:limit]
+	}
 	if l.cursor >= len(page) {
 		l.cursor = len(page) - 1
 	}
@@ -191,6 +211,9 @@ type entryDeletedMsg struct {
 // ---------------------------------------------------------------------------
 
 func (a AppModel) updateList(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// Keep list height in sync with terminal size.
+	a.list.height = a.height
+
 	switch a.list.sub {
 	case listSubDetail:
 		return a.updateListDetail(msg)
@@ -299,6 +322,10 @@ func (a AppModel) updateListMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case "down", "j":
 		page := a.list.currentPageEntries()
+		limit := a.list.visiblePageSize()
+		if len(page) > limit {
+			page = page[:limit]
+		}
 		if a.list.cursor < len(page)-1 {
 			a.list.cursor++
 		}
@@ -633,6 +660,12 @@ func (l listScreenModel) viewMain(title string) string {
 
 	page := l.currentPageEntries()
 
+	// Cap to visible rows so title stays on screen.
+	maxRows := l.visiblePageSize()
+	if len(page) > maxRows {
+		page = page[:maxRows]
+	}
+
 	// Header row
 	header := listHeaderStyle.Render(fmt.Sprintf(
 		"  %-5s %-42s %-14s %s",
@@ -674,9 +707,9 @@ func (l listScreenModel) viewMain(title string) string {
 
 	var help string
 	if l.mainZone == zoneButtons {
-		help = appHelpStyle.Render("←/→: choose action • enter: select • tab: back to list • esc: menu")
+		help = appHelpStyle.Render("←/→: choose action • enter: activate • tab: back to list • esc: menu")
 	} else {
-		help = appHelpStyle.Render("↑/↓: navigate • enter: view • e: edit • d: delete • ←/→: page • esc: menu")
+		help = appHelpStyle.Render("↑/↓: navigate • enter: view • e: edit • d: delete • ←/→: page • tab: actions • esc: menu")
 	}
 
 	body := lipgloss.JoinVertical(lipgloss.Left,
@@ -727,9 +760,9 @@ func (l listScreenModel) viewDetail(title string) string {
 
 	var help string
 	if l.detailZone == zoneButtons {
-		help = appHelpStyle.Render("←/→: choose action • enter: select • tab: back to entry • esc: list")
+		help = appHelpStyle.Render("←/→: choose action • enter: activate • tab: back to entry • esc: list")
 	} else {
-		help = appHelpStyle.Render("e: edit • d: delete • esc/enter: back to list")
+		help = appHelpStyle.Render("tab: actions • e: edit • d: delete • esc/enter: back to list")
 	}
 
 	content := lipgloss.JoinVertical(lipgloss.Left,
@@ -786,7 +819,7 @@ func (l listScreenModel) viewEdit(title string) string {
 
 	var help string
 	if f.focus == editFocusButtons {
-		help = appHelpStyle.Render("←/→: choose action • enter: select • tab: back to body")
+		help = appHelpStyle.Render("←/→: choose action • enter: activate • tab: back to body")
 	} else {
 		help = appHelpStyle.Render("tab: next field • enter: save (on tag) • ctrl+s: save • esc: cancel")
 	}

@@ -67,6 +67,7 @@ var (
 type AppModel struct {
 	db      *database.Queries
 	current screen
+	height  int // terminal height from tea.WindowSizeMsg
 
 	// sub-models (one per screen)
 	menu         menuModel
@@ -107,6 +108,12 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Global: ctrl+c always quits.
 	if kMsg, ok := msg.(tea.KeyMsg); ok && kMsg.String() == "ctrl+c" {
 		return a, tea.Quit
+	}
+
+	// Global: capture terminal height for dynamic page sizing.
+	if sz, ok := msg.(tea.WindowSizeMsg); ok {
+		a.height = sz.Height
+		return a, nil
 	}
 
 	// Global: handle async data messages — route to the currently active screen.

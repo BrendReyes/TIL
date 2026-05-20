@@ -170,6 +170,18 @@ func (a AppModel) updateReviewEmpty(msg tea.Msg) (tea.Model, tea.Cmd) {
 	bar := &a.reviewScreen.emptyBar
 
 	switch kMsg.String() {
+	case "r":
+    a.confirm = newConfirmModel(
+        "Reset ALL review progress?",
+        []string{
+            "Every entry's interval, ease factor, and review count",
+            "will be cleared. This cannot be undone.",
+        },
+    )
+    a.confirmReturn = screenReview
+    a.current = screenConfirm
+    return a, nil
+	
 	case "esc", "q":
 		a.current = screenMenu
 		return a, nil
@@ -279,7 +291,7 @@ func (a AppModel) viewReviewEmpty() string {
 	if a.reviewScreen.emptyBar.focused {
 		focusHint = appHelpStyle.Render("←/→: choose action • enter: select • tab: back to info")
 	} else {
-		focusHint = appHelpStyle.Render("tab: focus buttons • esc: back to menu")
+		focusHint = appHelpStyle.Render("tab: focus buttons • r: reset all • esc: back to menu")
 	}
 
 	return appDocStyle.Render(lipgloss.JoinVertical(lipgloss.Left,
