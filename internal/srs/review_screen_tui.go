@@ -277,7 +277,7 @@ func (a AppModel) viewReviewEmpty() string {
 
 	var focusHint string
 	if a.reviewScreen.emptyBar.focused {
-		focusHint = appHelpStyle.Render("←/→: choose action • enter: activate • tab: back to info")
+		focusHint = appHelpStyle.Render("←/→: choose action • enter: select • tab: back to info")
 	} else {
 		focusHint = appHelpStyle.Render("tab: focus buttons • esc: back to menu")
 	}

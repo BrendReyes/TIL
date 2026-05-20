@@ -424,9 +424,9 @@ func (d deleteScreenModel) viewList(title string) string {
 
 	var help string
 	if d.zone == zoneButtons {
-		help = appHelpStyle.Render("←/→: choose action • enter: activate • tab: back to list")
+		help = appHelpStyle.Render("←/→: choose action • enter: select • tab: back to list")
 	} else {
-		help = appHelpStyle.Render("↑/↓: navigate • enter: select to delete • ←/→: page • tab: actions • esc: menu")
+		help = appHelpStyle.Render("↑/↓: navigate • enter: select to delete • ←/→: page • esc: menu")
 	}
 
 	body := lipgloss.JoinVertical(lipgloss.Left,

@@ -312,7 +312,7 @@ func (m addScreenModel) View() string {
 
 	var help string
 	if m.focus == addFocusButtons {
-		help = appHelpStyle.Render("←/→: choose action • enter: activate • tab: back to body")
+		help = appHelpStyle.Render("←/→: choose action • enter: select • tab: back to body")
 	} else {
 		help = appHelpStyle.Render("tab: next field • enter: save (on tag) • ctrl+s: save • esc: menu")
 	}

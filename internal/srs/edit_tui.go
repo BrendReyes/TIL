@@ -251,7 +251,7 @@ func (m model) View() string {
 
 	var help string
 	if m.focus == editFocusButtons {
-		help = helpStyle.Render("←/→: choose action • enter: activate • tab: back to body")
+		help = helpStyle.Render("←/→: choose action • enter: select • tab: back to body")
 	} else {
 		help = helpStyle.Render("tab: next field • enter: save (on tag) • ctrl+s: save • esc: cancel")
 	}

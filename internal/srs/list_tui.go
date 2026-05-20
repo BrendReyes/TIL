@@ -674,9 +674,9 @@ func (l listScreenModel) viewMain(title string) string {
 
 	var help string
 	if l.mainZone == zoneButtons {
-		help = appHelpStyle.Render("←/→: choose action • enter: activate • tab: back to list • esc: menu")
+		help = appHelpStyle.Render("←/→: choose action • enter: select • tab: back to list • esc: menu")
 	} else {
-		help = appHelpStyle.Render("↑/↓: navigate • enter: view • e: edit • d: delete • ←/→: page • tab: actions • esc: menu")
+		help = appHelpStyle.Render("↑/↓: navigate • enter: view • e: edit • d: delete • ←/→: page • esc: menu")
 	}
 
 	body := lipgloss.JoinVertical(lipgloss.Left,
@@ -727,9 +727,9 @@ func (l listScreenModel) viewDetail(title string) string {
 
 	var help string
 	if l.detailZone == zoneButtons {
-		help = appHelpStyle.Render("←/→: choose action • enter: activate • tab: back to entry • esc: list")
+		help = appHelpStyle.Render("←/→: choose action • enter: select • tab: back to entry • esc: list")
 	} else {
-		help = appHelpStyle.Render("tab: actions • e: edit • d: delete • esc/enter: back to list")
+		help = appHelpStyle.Render("e: edit • d: delete • esc/enter: back to list")
 	}
 
 	content := lipgloss.JoinVertical(lipgloss.Left,
@@ -786,7 +786,7 @@ func (l listScreenModel) viewEdit(title string) string {
 
 	var help string
 	if f.focus == editFocusButtons {
-		help = appHelpStyle.Render("←/→: choose action • enter: activate • tab: back to body")
+		help = appHelpStyle.Render("←/→: choose action • enter: select • tab: back to body")
 	} else {
 		help = appHelpStyle.Render("tab: next field • enter: save (on tag) • ctrl+s: save • esc: cancel")
 	}
