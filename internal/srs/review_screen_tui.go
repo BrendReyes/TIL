@@ -14,9 +14,16 @@ import (
 type reviewSubScreen int
 
 const (
-	reviewSubSession    reviewSubScreen = iota // active card review
-	reviewSubEmpty                             // nothing due
-	reviewSubComplete                          // session finished
+	reviewSubSession     reviewSubScreen = iota // active card review
+	reviewSubEmpty                              // nothing due
+	reviewSubComplete                           // session finished
+	reviewSubResetResult                        // reset succeeded
+)
+
+// Button indices for the empty-state bar
+const (
+	reviewBtnBack  = 0
+	reviewBtnReset = 1
 )
 
 // ---------------------------------------------------------------------------
@@ -37,21 +44,30 @@ var (
 				BorderForeground(lipgloss.Color("62")).
 				Padding(1, 4).
 				MarginTop(1)
+
+	reviewResetSuccessStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("46")).
+				Bold(true)
 )
 
 // ---------------------------------------------------------------------------
-// reviewScreenState — wraps reviewModel + sub-screen state
-// Stored in AppModel.review (pointer); nil means not started.
+// reviewScreen — wraps reviewModel + sub-screen state + reset bar
 // ---------------------------------------------------------------------------
-
-// We track sub-screen and completion data alongside the reviewModel pointer.
-// These live in AppModel directly since review is already a pointer field.
 
 type reviewScreen struct {
 	model         *reviewModel
 	sub           reviewSubScreen
-	reviewedCount int // snapshot at completion
-	totalDue      int // total entries when session started
+	reviewedCount int       // snapshot at completion
+	totalDue      int       // total entries when session started
+	emptyBar      buttonBar // [Back] [Reset] on empty state
+	resetCount    int64     // entries reset
+	resetErr      error
+}
+
+func newReviewScreen() reviewScreen {
+	bar := newButtonBar([]string{"Back", "Reset All"})
+	bar.SetDanger(reviewBtnReset)
+	return reviewScreen{emptyBar: bar}
 }
 
 // ---------------------------------------------------------------------------
@@ -59,20 +75,28 @@ type reviewScreen struct {
 // ---------------------------------------------------------------------------
 
 func (a AppModel) updateReview(msg tea.Msg) (tea.Model, tea.Cmd) {
-	// ── Handle dueEntriesFetchedMsg: initialise session ─────────────────────
+	// ── dueEntriesFetchedMsg: initialise session ─────────────────────────────
 	if ev, ok := msg.(dueEntriesFetchedMsg); ok {
+		rs := newReviewScreen()
 		if ev.err != nil || len(ev.entries) == 0 {
-			// Nothing due — show empty state
-			a.reviewScreen.sub = reviewSubEmpty
+			rs.sub = reviewSubEmpty
+			a.reviewScreen = rs
 			a.current = screenReview
 			return a, nil
 		}
-		a.reviewScreen = reviewScreen{
-			model:    NewReviewModel(ev.entries, a.db),
-			sub:      reviewSubSession,
-			totalDue: len(ev.entries),
-		}
+		rs.model = NewReviewModel(ev.entries, a.db)
+		rs.sub = reviewSubSession
+		rs.totalDue = len(ev.entries)
+		a.reviewScreen = rs
 		a.current = screenReview
+		return a, nil
+	}
+
+	// ── reviewResetMsg: reset completed ──────────────────────────────────────
+	if ev, ok := msg.(reviewResetMsg); ok {
+		a.reviewScreen.resetCount = ev.count
+		a.reviewScreen.resetErr = ev.err
+		a.reviewScreen.sub = reviewSubResetResult
 		return a, nil
 	}
 
@@ -81,6 +105,8 @@ func (a AppModel) updateReview(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a.updateReviewEmpty(msg)
 	case reviewSubComplete:
 		return a.updateReviewComplete(msg)
+	case reviewSubResetResult:
+		return a.updateReviewResetResult(msg)
 	default:
 		return a.updateReviewSession(msg)
 	}
@@ -94,7 +120,7 @@ func (a AppModel) updateReviewSession(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, nil
 	}
 
-	// Handle reviewUpdatedMsg here to avoid it triggering tea.Quit
+	// Handle reviewUpdatedMsg — avoid it triggering tea.Quit
 	if ev, ok := msg.(reviewUpdatedMsg); ok {
 		if ev.err != nil {
 			a.reviewScreen.model.err = ev.err
@@ -102,7 +128,6 @@ func (a AppModel) updateReviewSession(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.reviewScreen.sub = reviewSubComplete
 			return a, nil
 		}
-		// If the model flagged quitting, transition to complete screen
 		if a.reviewScreen.model.quitting ||
 			a.reviewScreen.model.currentIndex >= len(a.reviewScreen.model.entries) {
 			a.reviewScreen.reviewedCount = a.reviewScreen.model.reviewedCount
@@ -112,23 +137,22 @@ func (a AppModel) updateReviewSession(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, nil
 	}
 
-	// Intercept q/esc/ctrl+c to go to menu directly
+	// Intercept q/esc to go to complete screen
 	if kMsg, ok := msg.(tea.KeyMsg); ok {
 		switch kMsg.String() {
-		case "q", "esc", "ctrl+c":
+		case "q", "esc":
 			a.reviewScreen.reviewedCount = a.reviewScreen.model.reviewedCount
 			a.reviewScreen.sub = reviewSubComplete
 			return a, nil
 		}
 	}
 
-	// Delegate to reviewModel.Update — intercept tea.Quit via quitting flag.
+	// Delegate to reviewModel.Update
 	next, cmd := a.reviewScreen.model.Update(msg)
 	rm := next.(*reviewModel)
 	a.reviewScreen.model = rm
 
 	if rm.quitting || rm.currentIndex >= len(rm.entries) {
-		// Don't quit the program — completion screen lands when reviewUpdatedMsg arrives.
 		return a, cmd
 	}
 
@@ -138,13 +162,54 @@ func (a AppModel) updateReviewSession(msg tea.Msg) (tea.Model, tea.Cmd) {
 // ── Empty state ──────────────────────────────────────────────────────────────
 
 func (a AppModel) updateReviewEmpty(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if kMsg, ok := msg.(tea.KeyMsg); ok {
-		switch kMsg.String() {
-		case "esc", "q", "enter", " ":
-			a.current = screenMenu
-			return a, nil
-		}
+	kMsg, ok := msg.(tea.KeyMsg)
+	if !ok {
+		return a, nil
 	}
+
+	bar := &a.reviewScreen.emptyBar
+
+	switch kMsg.String() {
+	case "esc", "q":
+		a.current = screenMenu
+		return a, nil
+
+	case "tab":
+		bar.focused = !bar.focused
+		return a, nil
+	}
+
+	// Delegate to button bar when focused
+	if bar.focused {
+		bar.HandleKey(kMsg.String())
+		if bar.Activated() {
+			switch bar.ActiveIndex() {
+			case reviewBtnBack:
+				a.current = screenMenu
+				return a, nil
+			case reviewBtnReset:
+				// Open confirm modal — return here on cancel
+				a.confirm = newConfirmModel(
+					"Reset ALL review progress?",
+					[]string{
+						"Every entry's interval, ease factor, and review count",
+						"will be cleared. This cannot be undone.",
+					},
+				)
+				a.confirmReturn = screenReview
+				a.current = screenConfirm
+				return a, nil
+			}
+		}
+		return a, nil
+	}
+
+	// Row-level shortcuts when bar not focused
+	switch kMsg.String() {
+	case "enter", " ":
+		a.current = screenMenu
+	}
+
 	return a, nil
 }
 
@@ -154,7 +219,21 @@ func (a AppModel) updateReviewComplete(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if kMsg, ok := msg.(tea.KeyMsg); ok {
 		switch kMsg.String() {
 		case "esc", "q", "enter", " ":
-			a.reviewScreen = reviewScreen{} // reset
+			a.reviewScreen = reviewScreen{}
+			a.current = screenMenu
+			return a, nil
+		}
+	}
+	return a, nil
+}
+
+// ── Reset result screen ──────────────────────────────────────────────────────
+
+func (a AppModel) updateReviewResetResult(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if kMsg, ok := msg.(tea.KeyMsg); ok {
+		switch kMsg.String() {
+		case "esc", "q", "enter", " ":
+			a.reviewScreen = reviewScreen{}
 			a.current = screenMenu
 			return a, nil
 		}
@@ -172,6 +251,8 @@ func (a AppModel) viewReview() string {
 		return a.viewReviewEmpty()
 	case reviewSubComplete:
 		return a.viewReviewComplete()
+	case reviewSubResetResult:
+		return a.viewReviewResetResult()
 	default:
 		if a.reviewScreen.model != nil {
 			return a.reviewScreen.model.View()
@@ -179,6 +260,8 @@ func (a AppModel) viewReview() string {
 		return ""
 	}
 }
+
+// ── Empty state view ─────────────────────────────────────────────────────────
 
 func (a AppModel) viewReviewEmpty() string {
 	title := appTitleStyle.Render("  Review  ")
@@ -190,14 +273,24 @@ func (a AppModel) viewReviewEmpty() string {
 		appMutedStyle.Render("Keep adding entries and come back later."),
 	))
 
-	help := appHelpStyle.Render("enter/esc: back to menu")
+	bar := a.reviewScreen.emptyBar.View()
+
+	var focusHint string
+	if a.reviewScreen.emptyBar.focused {
+		focusHint = appHelpStyle.Render("←/→: choose action • enter: activate • tab: back to info")
+	} else {
+		focusHint = appHelpStyle.Render("tab: focus buttons • esc: back to menu")
+	}
 
 	return appDocStyle.Render(lipgloss.JoinVertical(lipgloss.Left,
 		title,
 		box,
-		help,
+		bar,
+		focusHint,
 	))
 }
+
+// ── Complete view ────────────────────────────────────────────────────────────
 
 func (a AppModel) viewReviewComplete() string {
 	title := appTitleStyle.Render("  Review Complete  ")
@@ -224,6 +317,37 @@ func (a AppModel) viewReviewComplete() string {
 	)
 
 	box := reviewStatBoxStyle.Render(summary)
+	help := appHelpStyle.Render("enter/esc: back to menu")
+
+	return appDocStyle.Render(lipgloss.JoinVertical(lipgloss.Left,
+		title,
+		box,
+		help,
+	))
+}
+
+// ── Reset result view ────────────────────────────────────────────────────────
+
+func (a AppModel) viewReviewResetResult() string {
+	title := appTitleStyle.Render("  Review Reset  ")
+
+	var content string
+	if a.reviewScreen.resetErr != nil {
+		content = appErrorStyle.Render("✗ Error: " + a.reviewScreen.resetErr.Error())
+	} else {
+		content = lipgloss.JoinVertical(lipgloss.Left,
+			reviewResetSuccessStyle.Render("✓  Reset complete!"),
+			"",
+			lipgloss.JoinHorizontal(lipgloss.Top,
+				statsLabelStyle.Render("Entries reset:"),
+				statsValueStyle.Render(fmt.Sprintf("%d", a.reviewScreen.resetCount)),
+			),
+			"",
+			appMutedStyle.Render("All review progress cleared — everything is due again."),
+		)
+	}
+
+	box := reviewStatBoxStyle.Render(content)
 	help := appHelpStyle.Render("enter/esc: back to menu")
 
 	return appDocStyle.Render(lipgloss.JoinVertical(lipgloss.Left,

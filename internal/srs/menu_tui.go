@@ -55,12 +55,12 @@ var (
 )
 
 const menuBanner = `
-██╗ ████████╗    ██╗    ██╗                          
-╚██╗╚══██╔══╝    ██║    ██║                          
- ╚██╗  ██║       ██║    ██║                          
- ██╔╝  ██║       ██║    ██║                          
-██╔╝   ██║       ██║    ███████╗    ██╗    ██╗    ██╗
-╚═╝    ╚═╝       ╚═╝    ╚══════╝    ╚═╝    ╚═╝    ╚═╝   
+ ████████╗    ██╗    ██╗     
+    ██╔══╝    ██║    ██║     
+    ██║       ██║    ██║     
+    ██║       ██║    ██║     
+    ██║       ██║    ███████╗
+    ╚═╝       ╚═╝    ╚══════╝
   Today I Learned
 `
 
@@ -166,9 +166,10 @@ func (a AppModel) selectMenuItem(idx int) (tea.Model, tea.Cmd) {
 		return a, fetchEntriesCmd(a.db)
 	case 2: // Review
 		return a, fetchDueEntriesCmd(a.db)
-	case 3: // Delete
+	case 3: // Delete — open directly to paginated list
 		a.delete = newDeleteScreenModel()
 		a.current = screenDelete
+		return a, fetchEntriesCmd(a.db)
 	case 4: // Stats
 		a.stats = newStatsScreenModel()
 		a.current = screenStats

@@ -150,14 +150,15 @@ func (a AppModel) updateConfirm(msg tea.Msg) (tea.Model, tea.Cmd) {
 // resolveConfirm routes back to the screen that opened the modal.
 func (a AppModel) resolveConfirm() (tea.Model, tea.Cmd) {
 	if !a.confirm.accepted {
-		// Cancelled — go back to wherever we came from
 		a.current = a.confirmReturn
 		return a, nil
 	}
-	// Accepted — fire the delete-all command and return to delete screen
 	a.current = a.confirmReturn
-	if a.confirmReturn == screenDelete {
+	switch a.confirmReturn {
+	case screenDelete:
 		return a, deleteAllEntriesCmd(a.db)
+	case screenReview:
+		return a, resetReviewsCmd(a.db)
 	}
 	return a, nil
 }

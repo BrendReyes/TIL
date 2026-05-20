@@ -84,9 +84,10 @@ type AppModel struct {
 
 func NewAppModel(db *database.Queries) AppModel {
 	return AppModel{
-		db:      db,
-		current: screenMenu,
-		menu:    newMenuModel(),
+		db:           db,
+		current:      screenMenu,
+		menu:         newMenuModel(),
+		reviewScreen: newReviewScreen(),
 	}
 }
 
@@ -108,18 +109,20 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, tea.Quit
 	}
 
-	// Global: handle async data messages that trigger screen transitions
-	// or need to reach the correct screen regardless of timing.
+	// Global: handle async data messages — route to the currently active screen.
 	switch msg.(type) {
 	case statsFetchedMsg:
 		return a.updateStats(msg)
 	case entryAddedMsg:
 		return a.updateAdd(msg)
 	case entriesFetchedMsg, entryDeletedMsg, entrySavedMsg:
+		if a.current == screenDelete {
+			return a.updateDelete(msg)
+		}
 		return a.updateList(msg)
 	case allDeletedMsg:
 		return a.updateDelete(msg)
-	case dueEntriesFetchedMsg, reviewUpdatedMsg:
+	case dueEntriesFetchedMsg, reviewUpdatedMsg, reviewResetMsg:
 		return a.updateReview(msg)
 	}
 

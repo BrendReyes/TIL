@@ -57,6 +57,18 @@ func fetchDueEntriesCmd(db *database.Queries) tea.Cmd {
 	}
 }
 
+type reviewResetMsg struct {
+	count int64
+	err   error
+}
+
+func resetReviewsCmd(db *database.Queries) tea.Cmd {
+	return func() tea.Msg {
+		count, err := db.ResetAllReviews(context.Background(), timeNow())
+		return reviewResetMsg{count: count, err: err}
+	}
+}
+
 func saveEditCmd(db *database.Queries, id int64, body, tag string) tea.Cmd {
 	return func() tea.Msg {
 		err := db.EditEntry(context.Background(), database.EditEntryParams{
