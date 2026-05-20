@@ -32,6 +32,25 @@ const (
 	listSubDeleteConfirm
 )
 
+// Button indices for the detail bar
+const (
+	detailBtnEdit   = 0
+	detailBtnDelete = 1
+	detailBtnBack   = 2
+)
+
+// Button indices for the main list bar
+const (
+	mainBtnRefresh = 0
+	mainBtnBack    = 1
+)
+
+// Button indices for the list inline delete confirm bar
+const (
+	listDeleteConfirmBtnYes = 0
+	listDeleteConfirmBtnNo  = 1
+)
+
 // ---------------------------------------------------------------------------
 // Styles
 // ---------------------------------------------------------------------------
@@ -84,12 +103,36 @@ type listScreenModel struct {
 	sub       listSubScreen
 	editForm  *model // reuses edit_tui model
 	editEntry database.Entry
+
+	// detail sub-screen
+	detailBar  buttonBar
+	detailZone focusZone // zoneRows (metadata) or zoneButtons
+
+	// main list bar
+	mainBar  buttonBar
+	mainZone focusZone // zoneRows (table) or zoneButtons
+
+	// inline delete confirm bar
+	deleteConfirmBar buttonBar
 }
 
 func newListScreenModel(db *database.Queries) listScreenModel {
+	detailBar := newButtonBar([]string{"Edit", "Delete", "Back"})
+	detailBar.SetDanger(detailBtnDelete)
+
+	mainBar := newButtonBar([]string{"Refresh", "Back"})
+
+	deleteConfirmBar := newButtonBar([]string{"Yes, Delete", "Cancel"})
+	deleteConfirmBar.SetDanger(listDeleteConfirmBtnYes)
+	deleteConfirmBar.cursor = listDeleteConfirmBtnNo // default to safe option
+	deleteConfirmBar.focused = true
+
 	return listScreenModel{
-		db:      db,
-		loading: true,
+		db:               db,
+		loading:          true,
+		detailBar:        detailBar,
+		mainBar:          mainBar,
+		deleteConfirmBar: deleteConfirmBar,
 	}
 }
 
@@ -163,6 +206,7 @@ func (a AppModel) updateList(msg tea.Msg) (tea.Model, tea.Cmd) {
 // ── Main list ───────────────────────────────────────────────────────────────
 
 func (a AppModel) updateListMain(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// ── Async messages (zone-independent) ───────────────────────────────────
 	switch msg := msg.(type) {
 	case entriesFetchedMsg:
 		if msg.err != nil {
@@ -184,7 +228,6 @@ func (a AppModel) updateListMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.list.err = msg.err
 			return a, nil
 		}
-		// Remove from local slice and refresh
 		updated := make([]database.Entry, 0, len(a.list.entries))
 		for _, e := range a.list.entries {
 			if e.ID != msg.id {
@@ -201,58 +244,102 @@ func (a AppModel) updateListMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		a.list.clampCursor()
 		return a, nil
+	}
 
-	case tea.KeyMsg:
-		switch msg.String() {
-		case "esc", "q":
-			a.current = screenMenu
+	kMsg, ok := msg.(tea.KeyMsg)
+	if !ok {
+		return a, nil
+	}
+
+	// esc / q always exit regardless of zone
+	switch kMsg.String() {
+	case "esc", "q":
+		a.current = screenMenu
+		a.list.mainZone = zoneRows
+		a.list.mainBar.focused = false
+		return a, nil
+	}
+
+	// ── Button bar zone ──────────────────────────────────────────────────────
+	if a.list.mainZone == zoneButtons {
+		switch kMsg.String() {
+		case "tab", "shift+tab":
+			a.list.mainZone = zoneRows
+			a.list.mainBar.focused = false
 			return a, nil
-
-		case "up", "k":
-			if a.list.cursor > 0 {
-				a.list.cursor--
-			}
-
-		case "down", "j":
-			page := a.list.currentPageEntries()
-			if a.list.cursor < len(page)-1 {
-				a.list.cursor++
-			}
-
-		case "left", "h":
-			if a.list.page > 0 {
-				a.list.page--
-				a.list.cursor = 0
-			}
-
-		case "right", "l":
-			if a.list.page < a.list.totalPage-1 {
-				a.list.page++
-				a.list.cursor = 0
-			}
-
-		case "enter":
-			if _, ok := a.list.selectedEntry(); ok {
-				a.list.sub = listSubDetail
-			}
-
-		case "e":
-			if entry, ok := a.list.selectedEntry(); ok {
-				a.list.editEntry = entry
-				a.list.editForm = newEditFormModel(entry.Body, entry.Tag)
-				a.list.sub = listSubEdit
-				return a, textarea.Blink
-			}
-
-		case "d":
-			if _, ok := a.list.selectedEntry(); ok {
-				a.list.sub = listSubDeleteConfirm
-			}
-
-		case "r":
-			a.list.loading = true
-			return a, fetchEntriesCmd(a.db)
 		}
+
+		a.list.mainBar.HandleKey(kMsg.String())
+		if a.list.mainBar.Activated() {
+			switch a.list.mainBar.ActiveIndex() {
+			case mainBtnRefresh:
+				a.list.mainZone = zoneRows
+				a.list.mainBar.focused = false
+				a.list.loading = true
+				return a, fetchEntriesCmd(a.db)
+			case mainBtnBack:
+				a.current = screenMenu
+				a.list.mainZone = zoneRows
+				a.list.mainBar.focused = false
+			}
+		}
+		return a, nil
+	}
+
+	// ── Row zone ─────────────────────────────────────────────────────────────
+	switch kMsg.String() {
+	case "tab":
+		a.list.mainZone = zoneButtons
+		a.list.mainBar.focused = true
+
+	case "up", "k":
+		if a.list.cursor > 0 {
+			a.list.cursor--
+		}
+
+	case "down", "j":
+		page := a.list.currentPageEntries()
+		if a.list.cursor < len(page)-1 {
+			a.list.cursor++
+		}
+
+	case "left", "h":
+		if a.list.page > 0 {
+			a.list.page--
+			a.list.cursor = 0
+		}
+
+	case "right", "l":
+		if a.list.page < a.list.totalPage-1 {
+			a.list.page++
+			a.list.cursor = 0
+		}
+
+	case "enter":
+		if _, ok := a.list.selectedEntry(); ok {
+			a.list.detailZone = zoneRows
+			a.list.detailBar.focused = false
+			a.list.detailBar.cursor = detailBtnEdit
+			a.list.sub = listSubDetail
+		}
+
+	case "e":
+		if entry, ok := a.list.selectedEntry(); ok {
+			a.list.editEntry = entry
+			a.list.editForm = newEditFormModel(entry.Body, entry.Tag)
+			a.list.sub = listSubEdit
+			return a, textarea.Blink
+		}
+
+	case "d":
+		if _, ok := a.list.selectedEntry(); ok {
+			a.list.deleteConfirmBar.cursor = listDeleteConfirmBtnNo
+			a.list.sub = listSubDeleteConfirm
+		}
+
+	case "r":
+		a.list.loading = true
+		return a, fetchEntriesCmd(a.db)
 	}
 
 	return a, nil
@@ -261,21 +348,76 @@ func (a AppModel) updateListMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 // ── Detail sub-screen ───────────────────────────────────────────────────────
 
 func (a AppModel) updateListDetail(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if msg, ok := msg.(tea.KeyMsg); ok {
-		switch msg.String() {
-		case "esc", "q", "enter", " ":
-			a.list.sub = listSubMain
-		case "e":
-			if entry, ok := a.list.selectedEntry(); ok {
-				a.list.editEntry = entry
-				a.list.editForm = newEditFormModel(entry.Body, entry.Tag)
-				a.list.sub = listSubEdit
-				return a, textarea.Blink
-			}
-		case "d":
-			a.list.sub = listSubDeleteConfirm
-		}
+	kMsg, ok := msg.(tea.KeyMsg)
+	if !ok {
+		return a, nil
 	}
+
+	// esc always goes back, regardless of zone
+	switch kMsg.String() {
+	case "esc", "q":
+		a.list.sub = listSubMain
+		a.list.detailZone = zoneRows
+		a.list.detailBar.focused = false
+		a.list.detailBar.cursor = detailBtnEdit
+		return a, nil
+	}
+
+	// ── Button bar focused ───────────────────────────────────────────────────
+	if a.list.detailZone == zoneButtons {
+		switch kMsg.String() {
+		case "tab", "shift+tab":
+			// tab out of bar → back to content zone
+			a.list.detailZone = zoneRows
+			a.list.detailBar.focused = false
+			return a, nil
+		}
+
+		a.list.detailBar.HandleKey(kMsg.String())
+		if a.list.detailBar.Activated() {
+			switch a.list.detailBar.ActiveIndex() {
+			case detailBtnEdit:
+				if entry, ok := a.list.selectedEntry(); ok {
+					a.list.editEntry = entry
+					a.list.editForm = newEditFormModel(entry.Body, entry.Tag)
+					a.list.detailZone = zoneRows
+					a.list.detailBar.focused = false
+					a.list.sub = listSubEdit
+					return a, textarea.Blink
+				}
+			case detailBtnDelete:
+				a.list.detailZone = zoneRows
+				a.list.detailBar.focused = false
+				a.list.deleteConfirmBar.cursor = listDeleteConfirmBtnNo
+				a.list.sub = listSubDeleteConfirm
+			case detailBtnBack:
+				a.list.sub = listSubMain
+				a.list.detailZone = zoneRows
+				a.list.detailBar.focused = false
+			}
+		}
+		return a, nil
+	}
+
+	// ── Content zone ─────────────────────────────────────────────────────────
+	switch kMsg.String() {
+	case "tab":
+		a.list.detailZone = zoneButtons
+		a.list.detailBar.focused = true
+	case "enter", " ":
+		a.list.sub = listSubMain
+	case "e":
+		if entry, ok := a.list.selectedEntry(); ok {
+			a.list.editEntry = entry
+			a.list.editForm = newEditFormModel(entry.Body, entry.Tag)
+			a.list.sub = listSubEdit
+			return a, textarea.Blink
+		}
+	case "d":
+		a.list.deleteConfirmBar.cursor = listDeleteConfirmBtnNo
+		a.list.sub = listSubDeleteConfirm
+	}
+
 	return a, nil
 }
 
@@ -297,24 +439,73 @@ func (a AppModel) updateListEdit(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+s", "ctrl+enter":
 			return a.submitListEdit()
 
-		case "enter":
-			if a.list.editForm.focus == 1 {
-				return a.submitListEdit()
-			}
-
-		case "tab", "shift+tab":
+		case "tab":
 			f := a.list.editForm
-			if f.focus == 0 {
-				f.focus = 1
+			switch f.focus {
+			case editFocusBody:
+				f.focus = editFocusTag
 				f.bodyInput.Blur()
+				f.bar.focused = false
 				a.list.editForm = f
 				return a, f.tagInput.Focus()
-			} else {
-				f.focus = 0
+			case editFocusTag:
+				f.focus = editFocusButtons
 				f.tagInput.Blur()
+				f.bar.focused = true
+				a.list.editForm = f
+				return a, nil
+			case editFocusButtons:
+				f.focus = editFocusBody
+				f.bar.focused = false
 				a.list.editForm = f
 				return a, f.bodyInput.Focus()
 			}
+
+		case "shift+tab":
+			f := a.list.editForm
+			switch f.focus {
+			case editFocusBody:
+				f.focus = editFocusButtons
+				f.bodyInput.Blur()
+				f.bar.focused = true
+				a.list.editForm = f
+				return a, nil
+			case editFocusTag:
+				f.focus = editFocusBody
+				f.tagInput.Blur()
+				f.bar.focused = false
+				a.list.editForm = f
+				return a, f.bodyInput.Focus()
+			case editFocusButtons:
+				f.focus = editFocusTag
+				f.bar.focused = false
+				a.list.editForm = f
+				return a, f.tagInput.Focus()
+			}
+		}
+
+		// ── Button bar active ────────────────────────────────────────────────
+		if a.list.editForm.focus == editFocusButtons {
+			f := a.list.editForm
+			f.bar.HandleKey(kMsg.String())
+			if f.bar.Activated() {
+				switch f.bar.ActiveIndex() {
+				case editBtnSave:
+					a.list.editForm = f
+					return a.submitListEdit()
+				case editBtnCancel:
+					a.list.editForm = nil
+					a.list.sub = listSubMain
+					return a, nil
+				}
+			}
+			a.list.editForm = f
+			return a, nil
+		}
+
+		// ── enter on tag field saves ─────────────────────────────────────────
+		if kMsg.String() == "enter" && a.list.editForm.focus == editFocusTag {
+			return a.submitListEdit()
 		}
 	}
 
@@ -324,7 +515,6 @@ func (a AppModel) updateListEdit(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.list.editForm.err = ev.err
 			return a, nil
 		}
-		// Update in local slice
 		for i, e := range a.list.entries {
 			if e.ID == a.list.editEntry.ID {
 				a.list.entries[i].Body = ev.body
@@ -339,9 +529,9 @@ func (a AppModel) updateListEdit(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	f := a.list.editForm
 	var cmd tea.Cmd
-	if f.focus == 0 {
+	if f.focus == editFocusBody {
 		f.bodyInput, cmd = f.bodyInput.Update(msg)
-	} else {
+	} else if f.focus == editFocusTag {
 		f.tagInput, cmd = f.tagInput.Update(msg)
 	}
 	a.list.editForm = f
@@ -364,17 +554,40 @@ func (a AppModel) submitListEdit() (tea.Model, tea.Cmd) {
 // ── Delete confirm sub-screen ───────────────────────────────────────────────
 
 func (a AppModel) updateListDeleteConfirm(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if kMsg, ok := msg.(tea.KeyMsg); ok {
-		switch kMsg.String() {
-		case "y", "Y":
+	kMsg, ok := msg.(tea.KeyMsg)
+	if !ok {
+		return a, nil
+	}
+
+	switch kMsg.String() {
+	case "esc", "q":
+		a.list.deleteConfirmBar.cursor = listDeleteConfirmBtnNo
+		a.list.sub = listSubMain
+		return a, nil
+
+	case "y", "Y":
+		if entry, ok := a.list.selectedEntry(); ok {
+			a.list.deleteConfirmBar.cursor = listDeleteConfirmBtnNo
+			a.list.sub = listSubMain
+			return a, deleteEntryCmd(a.db, entry.ID)
+		}
+	}
+
+	a.list.deleteConfirmBar.HandleKey(kMsg.String())
+	if a.list.deleteConfirmBar.Activated() {
+		switch a.list.deleteConfirmBar.ActiveIndex() {
+		case listDeleteConfirmBtnYes:
 			if entry, ok := a.list.selectedEntry(); ok {
+				a.list.deleteConfirmBar.cursor = listDeleteConfirmBtnNo
 				a.list.sub = listSubMain
 				return a, deleteEntryCmd(a.db, entry.ID)
 			}
-		case "n", "N", "esc", "q":
+		case listDeleteConfirmBtnNo:
+			a.list.deleteConfirmBar.cursor = listDeleteConfirmBtnNo
 			a.list.sub = listSubMain
 		}
 	}
+
 	return a, nil
 }
 
@@ -457,9 +670,14 @@ func (l listScreenModel) viewMain(title string) string {
 		l.page+1, l.totalPage, len(l.entries),
 	))
 
-	help := appHelpStyle.Render(
-		"↑/↓: navigate • enter: view • e: edit • d: delete • ←/→: page • r: refresh • esc: menu",
-	)
+	bar := l.mainBar.View()
+
+	var help string
+	if l.mainZone == zoneButtons {
+		help = appHelpStyle.Render("←/→: choose action • enter: activate • tab: back to list • esc: menu")
+	} else {
+		help = appHelpStyle.Render("↑/↓: navigate • enter: view • e: edit • d: delete • ←/→: page • tab: actions • esc: menu")
+	}
 
 	body := lipgloss.JoinVertical(lipgloss.Left,
 		title, "",
@@ -468,6 +686,7 @@ func (l listScreenModel) viewMain(title string) string {
 		rows,
 		divider,
 		pagination,
+		bar,
 		help,
 	)
 
@@ -504,7 +723,14 @@ func (l listScreenModel) viewDetail(title string) string {
 
 	bodyBox := listDetailBoxStyle.Render(entry.Body)
 
-	help := appHelpStyle.Render("e: edit • d: delete • esc/enter: back to list")
+	bar := l.detailBar.View()
+
+	var help string
+	if l.detailZone == zoneButtons {
+		help = appHelpStyle.Render("←/→: choose action • enter: activate • tab: back to entry • esc: list")
+	} else {
+		help = appHelpStyle.Render("tab: actions • e: edit • d: delete • esc/enter: back to list")
+	}
 
 	content := lipgloss.JoinVertical(lipgloss.Left,
 		title, "",
@@ -514,7 +740,7 @@ func (l listScreenModel) viewDetail(title string) string {
 		reviewLine,
 		"",
 		bodyBox,
-		"",
+		bar,
 		help,
 	)
 
@@ -540,19 +766,30 @@ func (l listScreenModel) viewEdit(title string) string {
 	tagLabel := "Tag (required)"
 	var bodyView, tagView string
 
-	if f.focus == 0 {
+	switch f.focus {
+	case editFocusBody:
 		bodyLabel = focusedStyle.Render("● " + bodyLabel)
 		tagLabel = blurredStyle.Render("  " + tagLabel)
 		bodyView = focusedBorderStyle.Render(f.bodyInput.View())
 		tagView = blurredBorderStyle.Render(f.tagInput.View())
-	} else {
+	case editFocusTag:
 		bodyLabel = blurredStyle.Render("  " + bodyLabel)
 		tagLabel = focusedStyle.Render("● " + tagLabel)
 		bodyView = blurredBorderStyle.Render(f.bodyInput.View())
 		tagView = focusedBorderStyle.Render(f.tagInput.View())
+	case editFocusButtons:
+		bodyLabel = blurredStyle.Render("  " + bodyLabel)
+		tagLabel = blurredStyle.Render("  " + tagLabel)
+		bodyView = blurredBorderStyle.Render(f.bodyInput.View())
+		tagView = blurredBorderStyle.Render(f.tagInput.View())
 	}
 
-	help := appHelpStyle.Render("tab: switch • enter: save (on tag) • ctrl+s: save • esc: cancel")
+	var help string
+	if f.focus == editFocusButtons {
+		help = appHelpStyle.Render("←/→: choose action • enter: activate • tab: back to body")
+	} else {
+		help = appHelpStyle.Render("tab: next field • enter: save (on tag) • ctrl+s: save • esc: cancel")
+	}
 
 	s := lipgloss.JoinVertical(lipgloss.Left,
 		editTitle,
@@ -563,6 +800,7 @@ func (l listScreenModel) viewEdit(title string) string {
 		"",
 		tagLabel,
 		tagView,
+		f.bar.View(),
 		help,
 	)
 
@@ -582,9 +820,20 @@ func (l listScreenModel) viewDeleteConfirm(title string) string {
 		preview = preview[:60] + "…"
 	}
 
-	warning := listDeleteWarningStyle.Render("⚠  Delete this entry?")
-	entryLine := listRowMutedStyle.Render(fmt.Sprintf("  #%d  ", entry.ID)) +
-		listRowNormalStyle.Render(preview)
+	warning := listDeleteWarningStyle.Render("⚠  Delete this entry permanently?")
+	idLine := listRowMutedStyle.Render(fmt.Sprintf("Entry #%d", entry.ID))
+	tagLine := lipgloss.JoinHorizontal(lipgloss.Top,
+		listRowMutedStyle.Render("Tag: "),
+		listTagStyle.Render(entry.Tag),
+	)
+	bodyBox := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("240")).
+		Padding(0, 2).
+		Width(60).
+		Render(preview)
+
+	bar := l.deleteConfirmBar.View()
 
 	box := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
@@ -593,17 +842,19 @@ func (l listScreenModel) viewDeleteConfirm(title string) string {
 		Render(lipgloss.JoinVertical(lipgloss.Left,
 			warning,
 			"",
-			entryLine,
+			idLine,
+			tagLine,
 			"",
-			listTagStyle.Render("  Tag: "+entry.Tag),
+			bodyBox,
+			"",
+			bar,
 		))
 
-	help := appHelpStyle.Render("y: confirm delete • n/esc: cancel")
+	help := appHelpStyle.Render("←/→: choose • enter: confirm • y: yes • esc: cancel")
 
 	content := lipgloss.JoinVertical(lipgloss.Left,
 		title, "",
 		box,
-		"",
 		help,
 	)
 
@@ -632,6 +883,7 @@ func newEditFormModel(body, tag string) *model {
 	return &model{
 		bodyInput: ta,
 		tagInput:  ti,
-		focus:     0,
+		focus:     editFocusBody,
+		bar:       newEditBar(),
 	}
 }

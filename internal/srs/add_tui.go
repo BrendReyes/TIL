@@ -25,10 +25,24 @@ type entryAddedMsg struct {
 // addScreenModel — embeds the form fields directly as a TUI page
 // ---------------------------------------------------------------------------
 
+// focus zones for the add form
+const (
+	addFocusBody    = 0
+	addFocusTag     = 1
+	addFocusButtons = 2
+)
+
+// button indices for the add form bar
+const (
+	addBtnSave   = 0
+	addBtnCancel = 1
+)
+
 type addScreenModel struct {
 	bodyInput textarea.Model
 	tagInput  textinput.Model
-	focus     int // 0 = body, 1 = tag
+	focus     int // addFocusBody | addFocusTag | addFocusButtons
+	bar       buttonBar
 	err       error
 
 	// confirmation state
@@ -51,10 +65,14 @@ func newAddScreenModel() addScreenModel {
 	ti.CharLimit = 100
 	ti.Width = 30
 
+	bar := newButtonBar([]string{"Save", "Cancel"})
+	bar.SetDanger(addBtnCancel)
+
 	return addScreenModel{
 		bodyInput: ta,
 		tagInput:  ti,
-		focus:     0,
+		focus:     addFocusBody,
+		bar:       bar,
 	}
 }
 
@@ -101,9 +119,8 @@ func (a AppModel) updateAdd(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyMsg:
 			switch msg.String() {
 			case "enter", " ", "esc", "q":
-				// Any key: back to fresh form
 				a.add = resetAddForm()
-				return a, textarea.Blink
+				return a, a.add.bodyInput.Focus()
 			}
 		}
 		return a, nil
@@ -141,35 +158,84 @@ func (a AppModel) updateAdd(msg tea.Msg) (tea.Model, tea.Cmd) {
 			tag := strings.TrimSpace(a.add.tagInput.Value())
 			return a, saveEntryCmd(a.db, body, tag)
 
-		case "enter":
-			if a.add.focus == 1 {
-				if err := a.add.validate(); err != nil {
-					a.add.err = err
-					return a, nil
-				}
-				body := strings.TrimSpace(a.add.bodyInput.Value())
-				tag := strings.TrimSpace(a.add.tagInput.Value())
-				return a, saveEntryCmd(a.db, body, tag)
-			}
-
-		case "tab", "shift+tab":
-			if a.add.focus == 0 {
-				a.add.focus = 1
+		case "tab":
+			switch a.add.focus {
+			case addFocusBody:
+				a.add.focus = addFocusTag
 				a.add.bodyInput.Blur()
+				a.add.bar.focused = false
 				return a, a.add.tagInput.Focus()
-			} else {
-				a.add.focus = 0
+			case addFocusTag:
+				a.add.focus = addFocusButtons
 				a.add.tagInput.Blur()
+				a.add.bar.focused = true
+				return a, nil
+			case addFocusButtons:
+				a.add.focus = addFocusBody
+				a.add.bar.focused = false
 				return a, a.add.bodyInput.Focus()
 			}
+
+		case "shift+tab":
+			switch a.add.focus {
+			case addFocusBody:
+				a.add.focus = addFocusButtons
+				a.add.bodyInput.Blur()
+				a.add.bar.focused = true
+				return a, nil
+			case addFocusTag:
+				a.add.focus = addFocusBody
+				a.add.tagInput.Blur()
+				a.add.bar.focused = false
+				return a, a.add.bodyInput.Focus()
+			case addFocusButtons:
+				a.add.focus = addFocusTag
+				a.add.bar.focused = false
+				return a, a.add.tagInput.Focus()
+			}
+		}
+
+		// ── Button bar active ────────────────────────────────────────────────
+		if a.add.focus == addFocusButtons {
+			a.add.bar.HandleKey(msg.String())
+			if a.add.bar.Activated() {
+				switch a.add.bar.ActiveIndex() {
+				case addBtnSave:
+					if err := a.add.validate(); err != nil {
+						a.add.err = err
+						// Return focus to body on validation failure
+						a.add.focus = addFocusBody
+						a.add.bar.focused = false
+						return a, a.add.bodyInput.Focus()
+					}
+					body := strings.TrimSpace(a.add.bodyInput.Value())
+					tag := strings.TrimSpace(a.add.tagInput.Value())
+					return a, saveEntryCmd(a.db, body, tag)
+				case addBtnCancel:
+					a.current = screenMenu
+					return a, nil
+				}
+			}
+			return a, nil
+		}
+
+		// ── enter on tag field saves ─────────────────────────────────────────
+		if msg.String() == "enter" && a.add.focus == addFocusTag {
+			if err := a.add.validate(); err != nil {
+				a.add.err = err
+				return a, nil
+			}
+			body := strings.TrimSpace(a.add.bodyInput.Value())
+			tag := strings.TrimSpace(a.add.tagInput.Value())
+			return a, saveEntryCmd(a.db, body, tag)
 		}
 	}
 
 	// ── Delegate input to focused field ─────────────────────────────────────
 	var cmd tea.Cmd
-	if a.add.focus == 0 {
+	if a.add.focus == addFocusBody {
 		a.add.bodyInput, cmd = a.add.bodyInput.Update(msg)
-	} else {
+	} else if a.add.focus == addFocusTag {
 		a.add.tagInput, cmd = a.add.tagInput.Update(msg)
 	}
 	return a, cmd
@@ -224,19 +290,32 @@ func (m addScreenModel) View() string {
 	tagLabel := "Tag (required)"
 
 	var bodyView, tagView string
-	if m.focus == 0 {
+	switch m.focus {
+	case addFocusBody:
 		bodyLabel = focusedStyle.Render("● " + bodyLabel)
 		tagLabel = blurredStyle.Render("  " + tagLabel)
 		bodyView = focusedBorderStyle.Render(m.bodyInput.View())
 		tagView = blurredBorderStyle.Render(m.tagInput.View())
-	} else {
+	case addFocusTag:
 		bodyLabel = blurredStyle.Render("  " + bodyLabel)
 		tagLabel = focusedStyle.Render("● " + tagLabel)
 		bodyView = blurredBorderStyle.Render(m.bodyInput.View())
 		tagView = focusedBorderStyle.Render(m.tagInput.View())
+	case addFocusButtons:
+		bodyLabel = blurredStyle.Render("  " + bodyLabel)
+		tagLabel = blurredStyle.Render("  " + tagLabel)
+		bodyView = blurredBorderStyle.Render(m.bodyInput.View())
+		tagView = blurredBorderStyle.Render(m.tagInput.View())
 	}
 
-	help := appHelpStyle.Render("tab: switch field • enter: save (on tag) • ctrl+s: save • esc: menu")
+	bar := m.bar.View()
+
+	var help string
+	if m.focus == addFocusButtons {
+		help = appHelpStyle.Render("←/→: choose action • enter: activate • tab: back to body")
+	} else {
+		help = appHelpStyle.Render("tab: next field • enter: save (on tag) • ctrl+s: save • esc: menu")
+	}
 
 	s := lipgloss.JoinVertical(lipgloss.Left,
 		title,
@@ -248,6 +327,7 @@ func (m addScreenModel) View() string {
 		"",
 		tagLabel,
 		tagView,
+		bar,
 		help,
 	)
 
