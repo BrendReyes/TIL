@@ -39,6 +39,17 @@ type statsFetchedMsg struct {
 	err        error
 }
 
+type tagsFetchedMsg struct {
+	tags []database.CountEntriesByTagRow
+	err  error
+}
+
+type tagDeletedMsg struct {
+	tag   string
+	count int64
+	err   error
+}
+
 // ---------------------------------------------------------------------------
 // Commands
 // ---------------------------------------------------------------------------
@@ -78,6 +89,20 @@ func saveEditCmd(db *database.Queries, id int64, body, tag string) tea.Cmd {
 			UpdatedAt: timeNow(),
 		})
 		return entrySavedMsg{body: body, tag: tag, err: err}
+	}
+}
+
+func fetchTagsCmd(db *database.Queries) tea.Cmd {
+	return func() tea.Msg {
+		tags, err := db.CountEntriesByTag(context.Background())
+		return tagsFetchedMsg{tags: tags, err: err}
+	}
+}
+
+func deleteByTagCmd(db *database.Queries, tag string) tea.Cmd {
+	return func() tea.Msg {
+		count, err := db.DeleteEntriesByTag(context.Background(), tag)
+		return tagDeletedMsg{tag: tag, count: count, err: err}
 	}
 }
 

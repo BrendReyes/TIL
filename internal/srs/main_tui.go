@@ -127,7 +127,7 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a.updateDelete(msg)
 		}
 		return a.updateList(msg)
-	case allDeletedMsg:
+	case allDeletedMsg, tagsFetchedMsg, tagDeletedMsg:
 		return a.updateDelete(msg)
 	case dueEntriesFetchedMsg, reviewUpdatedMsg, reviewResetMsg:
 		return a.updateReview(msg)

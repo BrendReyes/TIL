@@ -18,15 +18,18 @@ import (
 type deleteSubScreen int
 
 const (
-	deleteSubList    deleteSubScreen = iota // paginated list
-	deleteSubConfirm                        // single-entry confirm
-	deleteSubResult                         // delete-all result
+	deleteSubList      deleteSubScreen = iota // paginated list
+	deleteSubConfirm                          // single-entry confirm
+	deleteSubResult                           // delete-all result
+	deleteSubTagSelect                        // tag picker
+	deleteSubTagConfirm                       // confirm delete-by-tag
 )
 
 // Button indices for the list bar
 const (
 	deleteBtnDeleteAll = 0
-	deleteBtnBack      = 1
+	deleteBtnDeleteTag = 1
+	deleteBtnBack      = 2
 )
 
 // Button indices for the confirm bar
@@ -62,6 +65,23 @@ var (
 	deleteWarningTextStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color("9")).
 				Bold(true)
+
+	deleteTagSelectedStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("230")).
+				Background(lipgloss.Color("62")).
+				Bold(true)
+
+	deleteTagNormalStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("252"))
+
+	deleteTagCountStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("245"))
+
+	deleteTagInputBoxStyle = lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(lipgloss.Color("205")).
+				Padding(0, 1).
+				Width(36)
 )
 
 // ---------------------------------------------------------------------------
@@ -77,13 +97,24 @@ type deleteScreenModel struct {
 	cursor    int
 	page      int
 	totalPage int
-	zone      focusZone  // zoneRows or zoneButtons
-	listBar   buttonBar  // [Delete All] [Back]
+	zone      focusZone // zoneRows or zoneButtons
+	listBar   buttonBar // [Delete All] [Delete by Tag] [Back]
 
-	// confirm state
-	sub         deleteSubScreen
-	selected    database.Entry
-	confirmBar  buttonBar // [Yes] [No]
+	// single-entry confirm state
+	sub        deleteSubScreen
+	selected   database.Entry
+	confirmBar buttonBar // [Yes, Delete] [Cancel]
+
+	// tag select state
+	allTags      []database.CountEntriesByTagRow // full list from DB
+	filteredTags []database.CountEntriesByTagRow // after input filter
+	tagInput     string                          // current text input value
+	tagCursor    int                             // selected row in filtered list
+	tagLoading   bool
+
+	// tag confirm state
+	selectedTag      string
+	selectedTagCount int64
 
 	// result state
 	deleted int64
@@ -91,8 +122,9 @@ type deleteScreenModel struct {
 }
 
 func newDeleteScreenModel() deleteScreenModel {
-	listBar := newButtonBar([]string{"Delete All", "Back"})
+	listBar := newButtonBar([]string{"Delete All", "Delete by Tag", "Back"})
 	listBar.SetDanger(deleteBtnDeleteAll)
+	listBar.SetDanger(deleteBtnDeleteTag)
 	listBar.cursor = deleteBtnBack // default to safe option
 
 	confirmBar := newButtonBar([]string{"Yes, Delete", "Cancel"})
@@ -153,6 +185,30 @@ func (d *deleteScreenModel) clampCursor() {
 	}
 	if d.cursor < 0 {
 		d.cursor = 0
+	}
+}
+
+func (d *deleteScreenModel) applyTagFilter() {
+	input := strings.ToLower(strings.TrimSpace(d.tagInput))
+	if input == "" {
+		// Copy, never alias — aliasing allTags causes append to corrupt it
+		d.filteredTags = make([]database.CountEntriesByTagRow, len(d.allTags))
+		copy(d.filteredTags, d.allTags)
+	} else {
+		filtered := make([]database.CountEntriesByTagRow, 0, len(d.allTags))
+		for _, t := range d.allTags {
+			if strings.Contains(strings.ToLower(t.Tag), input) {
+				filtered = append(filtered, t)
+			}
+		}
+		d.filteredTags = filtered
+	}
+	// clamp tag cursor
+	if d.tagCursor >= len(d.filteredTags) {
+		d.tagCursor = len(d.filteredTags) - 1
+	}
+	if d.tagCursor < 0 {
+		d.tagCursor = 0
 	}
 }
 
@@ -224,6 +280,47 @@ func (a AppModel) updateDelete(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.delete.deleted = ev.count
 		a.delete.sub = deleteSubResult
 		return a, nil
+
+	case tagsFetchedMsg:
+		if ev.err != nil {
+			a.delete.err = ev.err
+			a.delete.tagLoading = false
+			return a, nil
+		}
+		a.delete.allTags = ev.tags
+		// Copy, never alias
+		a.delete.filteredTags = make([]database.CountEntriesByTagRow, len(ev.tags))
+		copy(a.delete.filteredTags, ev.tags)
+		a.delete.tagInput = ""
+		a.delete.tagCursor = 0
+		a.delete.tagLoading = false
+		return a, nil
+
+	case tagDeletedMsg:
+		if ev.err != nil {
+			a.delete.err = ev.err
+			a.delete.sub = deleteSubList
+			return a, nil
+		}
+		// Remove deleted entries from local slice, stay on list
+		updated := make([]database.Entry, 0, len(a.delete.entries))
+		for _, e := range a.delete.entries {
+			if !strings.EqualFold(strings.TrimSpace(e.Tag), strings.TrimSpace(ev.tag)) {
+				updated = append(updated, e)
+			}
+		}
+		a.delete.entries = updated
+		a.delete.totalPage = (len(updated) + pageSize - 1) / pageSize
+		if a.delete.totalPage == 0 {
+			a.delete.totalPage = 1
+		}
+		if a.delete.page >= a.delete.totalPage {
+			a.delete.page = a.delete.totalPage - 1
+		}
+		a.delete.clampCursor()
+		a.delete.confirmBar.cursor = deleteConfirmBtnNo
+		a.delete.sub = deleteSubList
+		return a, nil
 	}
 
 	switch a.delete.sub {
@@ -231,6 +328,10 @@ func (a AppModel) updateDelete(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a.updateDeleteConfirm(msg)
 	case deleteSubResult:
 		return a.updateDeleteResult(msg)
+	case deleteSubTagSelect:
+		return a.updateDeleteTagSelect(msg)
+	case deleteSubTagConfirm:
+		return a.updateDeleteTagConfirm(msg)
 	default:
 		return a.updateDeleteList(msg)
 	}
@@ -276,6 +377,13 @@ func (a AppModel) updateDeleteList(msg tea.Msg) (tea.Model, tea.Cmd) {
 				a.confirmReturn = screenDelete
 				a.current = screenConfirm
 				return a, nil
+			case deleteBtnDeleteTag:
+				a.delete.tagLoading = true
+				a.delete.tagInput = ""
+				a.delete.tagCursor = 0
+				a.delete.filteredTags = nil
+				a.delete.sub = deleteSubTagSelect
+				return a, fetchTagsCmd(a.db)
 			case deleteBtnBack:
 				a.current = screenMenu
 				return a, nil
@@ -371,6 +479,93 @@ func (a AppModel) updateDeleteResult(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return a, nil
 }
 
+// ── Tag select sub-screen ────────────────────────────────────────────────────
+
+func (a AppModel) updateDeleteTagSelect(msg tea.Msg) (tea.Model, tea.Cmd) {
+	kMsg, ok := msg.(tea.KeyMsg)
+	if !ok {
+		return a, nil
+	}
+
+	switch kMsg.String() {
+	case "esc", "q":
+		a.delete.sub = deleteSubList
+		return a, nil
+
+	case "enter":
+		if len(a.delete.filteredTags) == 0 {
+			return a, nil
+		}
+		row := a.delete.filteredTags[a.delete.tagCursor]
+		a.delete.selectedTag = row.Tag
+		a.delete.selectedTagCount = row.Count
+		a.delete.confirmBar.cursor = deleteConfirmBtnNo
+		a.delete.confirmBar.focused = true
+		a.delete.sub = deleteSubTagConfirm
+		return a, nil
+
+	case "up", "k":
+		if a.delete.tagCursor > 0 {
+			a.delete.tagCursor--
+			// sync input to selected tag
+			a.delete.tagInput = a.delete.filteredTags[a.delete.tagCursor].Tag
+		}
+
+	case "down", "j":
+		if a.delete.tagCursor < len(a.delete.filteredTags)-1 {
+			a.delete.tagCursor++
+			// sync input to selected tag
+			a.delete.tagInput = a.delete.filteredTags[a.delete.tagCursor].Tag
+		}
+
+	case "backspace":
+		if len(a.delete.tagInput) > 0 {
+			a.delete.tagInput = a.delete.tagInput[:len(a.delete.tagInput)-1]
+			a.delete.applyTagFilter()
+		}
+
+	default:
+		// Printable characters go to the input
+		if len(kMsg.String()) == 1 {
+			a.delete.tagInput += kMsg.String()
+			a.delete.applyTagFilter()
+			// sync cursor to top of filtered list
+			a.delete.tagCursor = 0
+		}
+	}
+
+	return a, nil
+}
+
+// ── Tag confirm sub-screen ───────────────────────────────────────────────────
+
+func (a AppModel) updateDeleteTagConfirm(msg tea.Msg) (tea.Model, tea.Cmd) {
+	kMsg, ok := msg.(tea.KeyMsg)
+	if !ok {
+		return a, nil
+	}
+
+	switch kMsg.String() {
+	case "esc", "q":
+		a.delete.sub = deleteSubTagSelect
+		a.delete.confirmBar.focused = false
+		return a, nil
+	}
+
+	a.delete.confirmBar.HandleKey(kMsg.String())
+	if a.delete.confirmBar.Activated() {
+		switch a.delete.confirmBar.ActiveIndex() {
+		case deleteConfirmBtnYes:
+			return a, deleteByTagCmd(a.db, a.delete.selectedTag)
+		case deleteConfirmBtnNo:
+			a.delete.sub = deleteSubTagSelect
+			a.delete.confirmBar.focused = false
+		}
+	}
+
+	return a, nil
+}
+
 // ---------------------------------------------------------------------------
 // View
 // ---------------------------------------------------------------------------
@@ -382,6 +577,10 @@ func (d deleteScreenModel) View() string {
 		return d.viewConfirm(title)
 	case deleteSubResult:
 		return d.viewResult(title)
+	case deleteSubTagSelect:
+		return d.viewTagSelect(title)
+	case deleteSubTagConfirm:
+		return d.viewTagConfirm(title)
 	default:
 		return d.viewList(title)
 	}
@@ -542,6 +741,95 @@ func (d deleteScreenModel) viewResult(title string) string {
 		Render(content)
 
 	help := appHelpStyle.Render("press any key to return to menu")
+
+	return appDocStyle.Render(lipgloss.JoinVertical(lipgloss.Left,
+		title,
+		box,
+		help,
+	))
+}
+// ── Tag select view ───────────────────────────────────────────────────────────
+
+func (d deleteScreenModel) viewTagSelect(title string) string {
+	if d.tagLoading {
+		return appDocStyle.Render(lipgloss.JoinVertical(lipgloss.Left,
+			title, "", appMutedStyle.Render("Loading tags...")))
+	}
+
+	// Input box
+	inputContent := d.tagInput
+	if inputContent == "" {
+		inputContent = appMutedStyle.Render("type to filter tags…")
+	}
+	inputBox := deleteTagInputBoxStyle.Render(inputContent)
+
+	inputLabel := focusedStyle.Render("● Tag")
+
+	// Tag list
+	var tagRows string
+	if len(d.filteredTags) == 0 {
+		tagRows = appMutedStyle.Render("  no matching tags")
+	} else {
+		for i, t := range d.filteredTags {
+			label := fmt.Sprintf("  %-28s", t.Tag)
+			count := deleteTagCountStyle.Render(fmt.Sprintf("%d entries", t.Count))
+			line := lipgloss.JoinHorizontal(lipgloss.Top, label, count)
+			if i == d.tagCursor {
+				tagRows += deleteTagSelectedStyle.Render("▶ "+strings.TrimPrefix(label, "  ")) +
+					" " + deleteTagCountStyle.Render(fmt.Sprintf("%d entries", t.Count)) + "\n"
+			} else {
+				tagRows += deleteTagNormalStyle.Render(line) + "\n"
+			}
+		}
+	}
+
+	listBox := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("62")).
+		Padding(0, 1).
+		Width(38).
+		Render(tagRows)
+
+	help := appHelpStyle.Render("type: filter • ↑/↓: select • enter: confirm • esc: back")
+
+	body := lipgloss.JoinVertical(lipgloss.Left,
+		title, "",
+		inputLabel,
+		inputBox,
+		"",
+		listBox,
+		help,
+	)
+
+	return appDocStyle.Render(body)
+}
+
+// ── Tag confirm view ─────────────────────────────────────────────────────────
+
+func (d deleteScreenModel) viewTagConfirm(title string) string {
+	warning := deleteWarningTextStyle.Render("⚠  Delete all entries with this tag?")
+
+	tagLine := lipgloss.JoinHorizontal(lipgloss.Top,
+		listRowMutedStyle.Render("Tag:     "),
+		listTagStyle.Render(d.selectedTag),
+	)
+	countLine := lipgloss.JoinHorizontal(lipgloss.Top,
+		listRowMutedStyle.Render("Entries: "),
+		deleteWarningTextStyle.Render(fmt.Sprintf("%d will be permanently deleted", d.selectedTagCount)),
+	)
+
+	bar := d.confirmBar.View()
+
+	box := deleteConfirmBoxStyle.Render(lipgloss.JoinVertical(lipgloss.Left,
+		warning,
+		"",
+		tagLine,
+		countLine,
+		"",
+		bar,
+	))
+
+	help := appHelpStyle.Render("←/→: choose • enter: confirm • esc: back to tags")
 
 	return appDocStyle.Render(lipgloss.JoinVertical(lipgloss.Left,
 		title,
