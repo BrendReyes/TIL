@@ -11,8 +11,10 @@ This is just a simple cli/tui tool to store what you have learned, mainly for wh
 - **TUI:** Interactive Terminal User Interface for easy management.
 - **Stats:** Track your learning progress over time.
 
-## Installation
+## Prerequisites
+must have [Go](https://go.dev/doc/install) installed in your system at least 1.25.7
 
+## Installation
 To install `til`, you must have [Go](https://go.dev/doc/install) installed on your system.
 
 ```bash
