@@ -2,7 +2,7 @@
 
 This is just a simple cli/tui tool to store what you have learned, mainly for when studying, debugging, learned something new, etc. And it has a simple spaced repetition review just a way to not completely forget everything.
 
-<img width="600" height="500" alt="demo" src="https://github.com/user-attachments/assets/9e6a9598-7f7b-4b61-a98c-8b98ff1aa0a6" />
+<img width="1000" height="700" alt="demo" src="https://github.com/user-attachments/assets/2d65245e-abbc-438a-bbfa-ddf1d2584e47" />
 
 ## Features
 
