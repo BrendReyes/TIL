@@ -1,32 +1,65 @@
-/*
-Copyright © 2026 NAME HERE <EMAIL ADDRESS>
-
-*/
 package main
 
 import (
-	"database/sql"
-	"log"
+    "database/sql"
+    "embed"
+    "log"
+    "os"
+    "path/filepath"
 
-	"github.com/brendreyes/til/cmd"
-	"github.com/brendreyes/til/internal/database"
-	"github.com/brendreyes/til/internal/srs"
-	_ "github.com/mattn/go-sqlite3"
+    "github.com/brendreyes/til/cmd"
+    "github.com/brendreyes/til/internal/database"
+    "github.com/brendreyes/til/internal/srs"
+    "github.com/pressly/goose/v3"
+    _ "modernc.org/sqlite"
 )
 
+//go:embed internal/sql/schema/*.sql
+var migrations embed.FS
+
 func main() {
-	db, err := sql.Open("sqlite3", "./til.db")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
+    db, dbPath, err := initDB()
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer db.Close()
 
-	queries := database.New(db)
+    queries := database.New(db)
+    s := &srs.State{
+        DB:     queries,
+        DBPath: dbPath,
+    }
+	
+    cmd.SetState(s)
+    cmd.Execute()
+}
 
-	s := &srs.State{
-		DB: queries,
-	}
+func initDB() (*sql.DB, string, error) {
+    configDir, err := os.UserConfigDir()
+    if err != nil {
+        return nil, "", err
+    }
 
-	cmd.SetState(s)
-	cmd.Execute()
+    appDir := filepath.Join(configDir, "til")
+    if err := os.MkdirAll(appDir, 0755); err != nil {
+        return nil, "", err
+    }
+
+    dbPath := filepath.Join(appDir, "til.db")
+    db, err := sql.Open("sqlite", dbPath)
+    if err != nil {
+        return nil, "", err
+    }
+
+    goose.SetBaseFS(migrations)
+    goose.SetLogger(goose.NopLogger())
+    if err := goose.SetDialect("sqlite3"); err != nil {
+        return nil, "", err
+    }
+
+    if err := goose.Up(db, "internal/sql/schema"); err != nil {
+        return nil, "", err
+    }
+
+    return db, dbPath, nil
 }
