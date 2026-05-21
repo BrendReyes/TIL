@@ -10,9 +10,7 @@ var tuiCmd = &cobra.Command{
 	Short:   "Start the interactive TUI",
 	Long:    `Launch the interactive Terminal User Interface to manage your learning entries.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		//here calls the tui
-		//return appState.RunMainTUI()
-		return nil
+		return appState.RunMainTUI()
 	},
 }
 
