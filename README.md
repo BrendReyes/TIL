@@ -1,6 +1,8 @@
 # TIL (Today I Learned)
 
-A CLI tool for capturing and reviewing things you learn, designed to help you retain information through spaced repetition.
+This is just a simple cli/tui tool to store what you have learned, mainly for when studying, debugging, learned something new, etc. And it has a simple spaced repetition review just a way to not completely forget everything.
+
+<img width="600" height="400" alt="demo" src="https://github.com/user-attachments/assets/2d65245e-abbc-438a-bbfa-ddf1d2584e47" />
 
 ## Features
 
@@ -9,8 +11,10 @@ A CLI tool for capturing and reviewing things you learn, designed to help you re
 - **TUI:** Interactive Terminal User Interface for easy management.
 - **Stats:** Track your learning progress over time.
 
-## Installation
+## Prerequisites
+must have [Go](https://go.dev/doc/install) installed in your system at least 1.25.7
 
+## Installation
 To install `til`, you must have [Go](https://go.dev/doc/install) installed on your system.
 
 ```bash
@@ -30,11 +34,15 @@ Make sure your Go bin directory is in your system's `PATH` to run the `til` comm
 til         # Show help and commands
 til tui     # Start the interactive TUI
 til add     # Add a new entry
+til delete  # Deletes an entry, all, or by tags
+til edit    # Edits an entry
 til review  # Start a review session
 til list    # List all entries
 til stats   # Show learning statistics
+til db      # current command is to show the database file path
 ```
 
-## License
+## Notes
+- this is just a simple personal project, it will definitely have a couple of undiscovered bugs.
+- idk what else to say 
 
-[MIT](LICENSE)
