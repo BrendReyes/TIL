@@ -126,6 +126,12 @@ func (m *reviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *reviewModel) submitScore() (tea.Model, tea.Cmd) {
+	// Guard against late keypresses arriving after the final card was submitted
+	// (currentIndex == len) while we wait for the save command to quit.
+	if m.currentIndex >= len(m.entries) {
+		return m, nil
+	}
+
 	// Map UI selection to SM-2 quality score
 	quality := 0
 	switch m.selection {

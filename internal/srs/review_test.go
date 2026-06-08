@@ -1,11 +1,117 @@
 package srs
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"github.com/brendreyes/til/internal/database"
 )
+
+// TestGetDueEntries_Scheduling guards against the timestamp-serialization bug
+// where a previously-reviewed but overdue entry never resurfaced because
+// SQLite's datetime() could not parse the stored last_reviewed_at. It must run
+// against the production driver (see helper_test.go) to be meaningful.
+func TestGetDueEntries_Scheduling(t *testing.T) {
+	q := newTestDB(t)
+	ctx := context.Background()
+	now := time.Now().UTC()
+
+	// Reviewed 10 days ago with a 1-day interval -> overdue, must be due.
+	overdue, err := q.CreateEntry(ctx, database.CreateEntryParams{
+		Body: "overdue", Tag: "t", CreatedAt: now, UpdatedAt: now,
+		LastReviewedAt: now.AddDate(0, 0, -10),
+	})
+	if err != nil {
+		t.Fatalf("create overdue: %v", err)
+	}
+	if err := q.UpdateReview(ctx, database.UpdateReviewParams{
+		ID: overdue.ID, LastReviewedAt: now.AddDate(0, 0, -10),
+		ReviewIntervalDays: 1, EaseFactor: 2.5, ReviewCount: 1,
+	}); err != nil {
+		t.Fatalf("update overdue: %v", err)
+	}
+
+	// Reviewed just now with a 30-day interval -> not yet due.
+	fresh, err := q.CreateEntry(ctx, database.CreateEntryParams{
+		Body: "fresh", Tag: "t", CreatedAt: now, UpdatedAt: now,
+		LastReviewedAt: now,
+	})
+	if err != nil {
+		t.Fatalf("create fresh: %v", err)
+	}
+	if err := q.UpdateReview(ctx, database.UpdateReviewParams{
+		ID: fresh.ID, LastReviewedAt: now,
+		ReviewIntervalDays: 30, EaseFactor: 2.5, ReviewCount: 1,
+	}); err != nil {
+		t.Fatalf("update fresh: %v", err)
+	}
+
+	due, err := q.GetDueEntries(ctx)
+	if err != nil {
+		t.Fatalf("GetDueEntries: %v", err)
+	}
+	if len(due) != 1 {
+		t.Fatalf("expected exactly 1 due entry, got %d", len(due))
+	}
+	if due[0].ID != overdue.ID {
+		t.Errorf("expected overdue entry id=%d to be due, got id=%d", overdue.ID, due[0].ID)
+	}
+
+	count, err := q.CountDueEntries(ctx)
+	if err != nil {
+		t.Fatalf("CountDueEntries: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("CountDueEntries = %d, want 1", count)
+	}
+}
+
+// TestLapse_KeepsReviewedStatus verifies that failing a card ("Again") restarts
+// the SM-2 progression without making the card look never-reviewed again, which
+// would corrupt the reviewed/unreviewed stats.
+func TestLapse_KeepsReviewedStatus(t *testing.T) {
+	q := newTestDB(t)
+	ctx := context.Background()
+	id := seedEntry(t, q, "lapse me", "t")
+
+	entry, err := q.GetEntryByID(ctx, id)
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+
+	// Pass it once (Good), then fail it (Again).
+	if err := q.UpdateReview(ctx, calculateNextReview(entry, 4)); err != nil {
+		t.Fatalf("good review: %v", err)
+	}
+	entry, _ = q.GetEntryByID(ctx, id)
+	if err := q.UpdateReview(ctx, calculateNextReview(entry, 1)); err != nil {
+		t.Fatalf("again review: %v", err)
+	}
+
+	entry, _ = q.GetEntryByID(ctx, id)
+	if entry.Repetitions != 0 {
+		t.Errorf("repetitions after lapse = %d, want 0", entry.Repetitions)
+	}
+	if entry.ReviewCount != 2 {
+		t.Errorf("review_count after two reviews = %d, want 2", entry.ReviewCount)
+	}
+
+	reviewed, err := q.CountReviewedEntries(ctx)
+	if err != nil {
+		t.Fatalf("count reviewed: %v", err)
+	}
+	if reviewed != 1 {
+		t.Errorf("reviewed count = %d, want 1 (lapsed card is still reviewed)", reviewed)
+	}
+	unreviewed, err := q.CountUnreviewedEntries(ctx)
+	if err != nil {
+		t.Fatalf("count unreviewed: %v", err)
+	}
+	if unreviewed != 0 {
+		t.Errorf("unreviewed count = %d, want 0", unreviewed)
+	}
+}
 
 func TestState_ReviewEntries(t *testing.T) {
 	type fields struct {
@@ -68,74 +174,85 @@ func Test_calculateNextReview(t *testing.T) {
 		quality int
 	}
 
+	// review_count is deliberately distinct from repetitions to prove the two
+	// move independently: repetitions drives the interval, review_count just
+	// counts up by one every time.
 	baseEntry := database.Entry{
 		ID:                 1,
 		ReviewIntervalDays: 6,
 		EaseFactor:         2.5,
-		ReviewCount:        2,
+		ReviewCount:        5,
+		Repetitions:        2,
 		LastReviewedAt:     time.Now().UTC(),
 	}
 
 	tests := []struct {
-		name              string
-		args              args
-		wantInterval      int64
-		wantEaseFactor    float64
-		wantReviewCount   int64
+		name            string
+		args            args
+		wantInterval    int64
+		wantEaseFactor  float64
+		wantReviewCount int64
+		wantRepetitions int64
 	}{
 		{
-			// quality < 3 → reset: interval=1, reviewCount=0, easeFactor unchanged
-			name: "Again (quality=1) resets interval and count",
+			// quality < 3 → lapse: interval=1, repetitions reset to 0,
+			// review_count still increments, easeFactor unchanged.
+			name: "Again (quality=1) restarts repetitions but counts the review",
 			args: args{
 				entry:   baseEntry,
 				quality: 1,
 			},
 			wantInterval:    1,
-			wantReviewCount: 0,
-			// easeFactor is not modified on failure path in calculateNextReview
-			wantEaseFactor: 2.5,
+			wantReviewCount: 6,
+			wantRepetitions: 0,
+			wantEaseFactor:  2.5,
 		},
 		{
-			// First review (reviewCount=0), Good (quality=4) → interval=1, count=1
-			name: "Good on first review sets interval to 1",
+			// First repetition (repetitions=0), Good (quality=4) → interval=1
+			name: "Good on first repetition sets interval to 1",
 			args: args{
 				entry: database.Entry{
 					ID:                 2,
 					ReviewIntervalDays: 1,
 					EaseFactor:         2.5,
 					ReviewCount:        0,
+					Repetitions:        0,
 					LastReviewedAt:     time.Now().UTC(),
 				},
 				quality: 4,
 			},
 			wantInterval:    1,
 			wantReviewCount: 1,
-			wantEaseFactor: 2.5,
+			wantRepetitions: 1,
+			wantEaseFactor:  2.5,
 		},
 		{
-			name: "Good on second review sets interval to 6",
+			name: "Good on second repetition sets interval to 6",
 			args: args{
 				entry: database.Entry{
 					ID:                 3,
 					ReviewIntervalDays: 1,
 					EaseFactor:         2.5,
 					ReviewCount:        1,
+					Repetitions:        1,
 					LastReviewedAt:     time.Now().UTC(),
 				},
 				quality: 4,
 			},
 			wantInterval:    6,
 			wantReviewCount: 2,
+			wantRepetitions: 2,
 			wantEaseFactor:  2.5,
 		},
 		{
-			name: "Good on subsequent review multiplies interval by ease factor",
+			name: "Good on subsequent repetition multiplies interval by ease factor",
 			args: args{
-				entry:   baseEntry, // reviewCount=2, interval=6, ef=2.5
+				entry:   baseEntry, // repetitions=2, interval=6, ef=2.5
 				quality: 4,
 			},
 			wantInterval:    15,
-			wantReviewCount: 3,
+			wantReviewCount: 6,
+			wantRepetitions: 3,
 			wantEaseFactor:  2.5,
 		},
 		{
@@ -145,7 +262,8 @@ func Test_calculateNextReview(t *testing.T) {
 				quality: 5,
 			},
 			wantInterval:    16,
-			wantReviewCount: 3,
+			wantReviewCount: 6,
+			wantRepetitions: 3,
 			wantEaseFactor:  2.6,
 		},
 		{
@@ -155,7 +273,8 @@ func Test_calculateNextReview(t *testing.T) {
 				quality: 3,
 			},
 			wantInterval:    14,
-			wantReviewCount: 3,
+			wantReviewCount: 6,
+			wantRepetitions: 3,
 			wantEaseFactor:  2.36,
 		},
 		{
@@ -165,13 +284,15 @@ func Test_calculateNextReview(t *testing.T) {
 					ID:                 5,
 					ReviewIntervalDays: 6,
 					EaseFactor:         1.3,
-					ReviewCount:        2,
+					ReviewCount:        9,
+					Repetitions:        2,
 					LastReviewedAt:     time.Now().UTC(),
 				},
 				quality: 3,
 			},
 			wantInterval:    8,
-			wantReviewCount: 3,
+			wantReviewCount: 10,
+			wantRepetitions: 3,
 			wantEaseFactor:  1.3,
 		},
 		{
@@ -182,12 +303,14 @@ func Test_calculateNextReview(t *testing.T) {
 					ReviewIntervalDays: 6,
 					EaseFactor:         0,
 					ReviewCount:        2,
+					Repetitions:        2,
 					LastReviewedAt:     time.Now().UTC(),
 				},
 				quality: 4,
 			},
 			wantInterval:    15,
 			wantReviewCount: 3,
+			wantRepetitions: 3,
 			wantEaseFactor:  2.5,
 		},
 	}
@@ -202,6 +325,10 @@ func Test_calculateNextReview(t *testing.T) {
 			if got.ReviewCount != tt.wantReviewCount {
 				t.Errorf("calculateNextReview() ReviewCount = %d, want %d",
 					got.ReviewCount, tt.wantReviewCount)
+			}
+			if got.Repetitions != tt.wantRepetitions {
+				t.Errorf("calculateNextReview() Repetitions = %d, want %d",
+					got.Repetitions, tt.wantRepetitions)
 			}
 			const epsilon = 0.001
 			if diff := got.EaseFactor - tt.wantEaseFactor; diff > epsilon || diff < -epsilon {

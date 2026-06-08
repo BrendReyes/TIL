@@ -26,10 +26,11 @@ const countDueEntries = `-- name: CountDueEntries :one
 SELECT COUNT(*) FROM entries
 WHERE (
     review_count = 0
-    OR datetime(last_reviewed_at, '+' || review_interval_days || ' days') <= datetime('now')
+    OR datetime(substr(last_reviewed_at, 1, 19), '+' || review_interval_days || ' days') <= datetime('now')
 )
 `
 
+// See GetDueEntries for why last_reviewed_at is sliced with substr().
 func (q *Queries) CountDueEntries(ctx context.Context) (int64, error) {
 	row := q.db.QueryRowContext(ctx, countDueEntries)
 	var count int64
@@ -105,7 +106,7 @@ VALUES (
     ?,
     ?
 )
-RETURNING id, body, tag, created_at, last_reviewed_at, review_interval_days, review_count, ease_factor, updated_at
+RETURNING id, body, tag, created_at, last_reviewed_at, review_interval_days, review_count, ease_factor, updated_at, repetitions
 `
 
 type CreateEntryParams struct {
@@ -135,6 +136,7 @@ func (q *Queries) CreateEntry(ctx context.Context, arg CreateEntryParams) (Entry
 		&i.ReviewCount,
 		&i.EaseFactor,
 		&i.UpdatedAt,
+		&i.Repetitions,
 	)
 	return i, err
 }
@@ -197,15 +199,20 @@ func (q *Queries) EditEntry(ctx context.Context, arg EditEntryParams) error {
 }
 
 const getDueEntries = `-- name: GetDueEntries :many
-SELECT id, body, tag, created_at, last_reviewed_at, review_interval_days, review_count, ease_factor, updated_at
+SELECT id, body, tag, created_at, last_reviewed_at, review_interval_days, review_count, ease_factor, updated_at, repetitions
 FROM entries
 WHERE (
     review_count = 0
-    OR datetime(last_reviewed_at, '+' || review_interval_days || ' days') <= datetime('now')
+    OR datetime(substr(last_reviewed_at, 1, 19), '+' || review_interval_days || ' days') <= datetime('now')
 )
 ORDER BY review_count ASC, last_reviewed_at ASC
 `
 
+// NOTE: last_reviewed_at is stored by the driver with a trailing timezone label
+// (e.g. "2006-01-02 15:04:05.999 +0000 UTC") that SQLite's datetime() cannot
+// parse, which makes the date arithmetic return NULL. All timestamps are written
+// as UTC, so we slice off the leading "YYYY-MM-DD HH:MM:SS" prefix that datetime()
+// can parse. See also CountDueEntries.
 func (q *Queries) GetDueEntries(ctx context.Context) ([]Entry, error) {
 	rows, err := q.db.QueryContext(ctx, getDueEntries)
 	if err != nil {
@@ -225,6 +232,7 @@ func (q *Queries) GetDueEntries(ctx context.Context) ([]Entry, error) {
 			&i.ReviewCount,
 			&i.EaseFactor,
 			&i.UpdatedAt,
+			&i.Repetitions,
 		); err != nil {
 			return nil, err
 		}
@@ -240,7 +248,7 @@ func (q *Queries) GetDueEntries(ctx context.Context) ([]Entry, error) {
 }
 
 const getEntriesByTag = `-- name: GetEntriesByTag :many
-SELECT id, body, tag, created_at, last_reviewed_at, review_interval_days, review_count, ease_factor, updated_at FROM entries
+SELECT id, body, tag, created_at, last_reviewed_at, review_interval_days, review_count, ease_factor, updated_at, repetitions FROM entries
 WHERE LOWER(TRIM(tag)) = LOWER(TRIM(?))
 ORDER BY id ASC
 `
@@ -264,6 +272,7 @@ func (q *Queries) GetEntriesByTag(ctx context.Context, trim string) ([]Entry, er
 			&i.ReviewCount,
 			&i.EaseFactor,
 			&i.UpdatedAt,
+			&i.Repetitions,
 		); err != nil {
 			return nil, err
 		}
@@ -279,7 +288,7 @@ func (q *Queries) GetEntriesByTag(ctx context.Context, trim string) ([]Entry, er
 }
 
 const getEntryByID = `-- name: GetEntryByID :one
-SELECT id, body, tag, created_at, last_reviewed_at, review_interval_days, review_count, ease_factor, updated_at FROM entries
+SELECT id, body, tag, created_at, last_reviewed_at, review_interval_days, review_count, ease_factor, updated_at, repetitions FROM entries
 WHERE id = ?
 `
 
@@ -296,12 +305,13 @@ func (q *Queries) GetEntryByID(ctx context.Context, id int64) (Entry, error) {
 		&i.ReviewCount,
 		&i.EaseFactor,
 		&i.UpdatedAt,
+		&i.Repetitions,
 	)
 	return i, err
 }
 
 const listAllEntry = `-- name: ListAllEntry :many
-SELECT id, body, tag, created_at, last_reviewed_at, review_interval_days, review_count, ease_factor, updated_at FROM entries
+SELECT id, body, tag, created_at, last_reviewed_at, review_interval_days, review_count, ease_factor, updated_at, repetitions FROM entries
 ORDER BY id ASC
 `
 
@@ -324,6 +334,7 @@ func (q *Queries) ListAllEntry(ctx context.Context) ([]Entry, error) {
 			&i.ReviewCount,
 			&i.EaseFactor,
 			&i.UpdatedAt,
+			&i.Repetitions,
 		); err != nil {
 			return nil, err
 		}
@@ -339,7 +350,7 @@ func (q *Queries) ListAllEntry(ctx context.Context) ([]Entry, error) {
 }
 
 const listEntryPaginated = `-- name: ListEntryPaginated :many
-SELECT id, body, tag, created_at, last_reviewed_at, review_interval_days, review_count, ease_factor, updated_at FROM entries
+SELECT id, body, tag, created_at, last_reviewed_at, review_interval_days, review_count, ease_factor, updated_at, repetitions FROM entries
 ORDER BY id ASC
 LIMIT ? OFFSET ?
 `
@@ -368,6 +379,7 @@ func (q *Queries) ListEntryPaginated(ctx context.Context, arg ListEntryPaginated
 			&i.ReviewCount,
 			&i.EaseFactor,
 			&i.UpdatedAt,
+			&i.Repetitions,
 		); err != nil {
 			return nil, err
 		}
@@ -387,7 +399,8 @@ UPDATE entries
 SET last_reviewed_at     = ?,
     review_interval_days = 1,
     ease_factor          = 2.5,
-    review_count         = 0
+    review_count         = 0,
+    repetitions          = 0
 `
 
 func (q *Queries) ResetAllReviews(ctx context.Context, lastReviewedAt time.Time) (int64, error) {
@@ -403,7 +416,8 @@ UPDATE entries
 SET last_reviewed_at     = ?,
     review_interval_days = ?,
     ease_factor          = ?,
-    review_count         = ?
+    review_count         = ?,
+    repetitions          = ?
 WHERE id = ?
 `
 
@@ -412,6 +426,7 @@ type UpdateReviewParams struct {
 	ReviewIntervalDays int64
 	EaseFactor         float64
 	ReviewCount        int64
+	Repetitions        int64
 	ID                 int64
 }
 
@@ -421,6 +436,7 @@ func (q *Queries) UpdateReview(ctx context.Context, arg UpdateReviewParams) erro
 		arg.ReviewIntervalDays,
 		arg.EaseFactor,
 		arg.ReviewCount,
+		arg.Repetitions,
 		arg.ID,
 	)
 	return err

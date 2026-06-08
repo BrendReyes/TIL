@@ -18,4 +18,5 @@ type Entry struct {
 	ReviewCount        int64
 	EaseFactor         float64
 	UpdatedAt          time.Time
+	Repetitions        int64
 }

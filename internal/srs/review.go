@@ -44,10 +44,10 @@ func calculateNextReview(entry database.Entry, quality int) database.UpdateRevie
 	if easeFactor < 1.3 {
 		easeFactor = 2.5
 	}
-	reviewCount := entry.ReviewCount
+	repetitions := entry.Repetitions
 
 	if quality < 3 {
-		reviewCount = 0
+		repetitions = 0
 		interval = 1
 	} else {
 		easeFactor = easeFactor + (0.1 - float64(5-quality)*(0.08+float64(5-quality)*0.02))
@@ -55,15 +55,16 @@ func calculateNextReview(entry database.Entry, quality int) database.UpdateRevie
 			easeFactor = 1.3
 		}
 
-		if reviewCount == 0 {
+		switch repetitions {
+		case 0:
 			interval = 1
-		} else if reviewCount == 1 {
+		case 1:
 			interval = 6
-		} else {
+		default:
 			interval = math.Round(interval * easeFactor)
 		}
 
-		reviewCount++
+		repetitions++
 	}
 
 	return database.UpdateReviewParams{
@@ -71,7 +72,8 @@ func calculateNextReview(entry database.Entry, quality int) database.UpdateRevie
 		LastReviewedAt:     time.Now().UTC(),
 		ReviewIntervalDays: int64(interval),
 		EaseFactor:         easeFactor,
-		ReviewCount:        reviewCount,
+		ReviewCount:        entry.ReviewCount + 1,
+		Repetitions:        repetitions,
 	}
 }
 

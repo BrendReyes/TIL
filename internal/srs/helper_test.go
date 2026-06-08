@@ -7,13 +7,13 @@ import (
 	"time"
 
 	"github.com/brendreyes/til/internal/database"
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 func newTestDB(t *testing.T) *database.Queries {
 	t.Helper()
 
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("open in-memory db: %v", err)
 	}
@@ -29,7 +29,8 @@ func newTestDB(t *testing.T) *database.Queries {
 		review_interval_days INTEGER  NOT NULL DEFAULT 1,
 		review_count         INTEGER  NOT NULL DEFAULT 0,
 		ease_factor          REAL     NOT NULL DEFAULT 2.5,
-		updated_at           DATETIME NOT NULL
+		updated_at           DATETIME NOT NULL,
+		repetitions          INTEGER  NOT NULL DEFAULT 0
 	);`
 
 	if _, err := db.Exec(schema); err != nil {
